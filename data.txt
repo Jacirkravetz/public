@@ -1,0 +1,72 @@
+Sub SalvarRegistro()
+    Dim wsBanco As Worksheet
+    Dim wsForm As Worksheet
+    Dim ultimaLinha As Long
+    
+    Set wsBanco = ThisWorkbook.Sheets("Banco de Dados")
+    Set wsForm = ThisWorkbook.Sheets("Entrada de Dados")
+    
+    ' Localizar a última linha
+    ultimaLinha = wsBanco.Cells(wsBanco.Rows.Count, 1).End(xlUp).Row + 1
+    
+    ' Copiar os dados do formulário para o banco de dados
+    wsBanco.Cells(ultimaLinha, 1).Value = ultimaLinha - 1 ' ID automático
+    wsBanco.Cells(ultimaLinha, 2).Value = wsForm.Range("B2").Value ' Nome do Projeto
+    wsBanco.Cells(ultimaLinha, 3).Value = wsForm.Range("B3").Value ' Código do Projeto
+    wsBanco.Cells(ultimaLinha, 4).Value = wsForm.Range("B4").Value ' Gerente do Projeto
+    wsBanco.Cells(ultimaLinha, 5).Value = wsForm.Range("B5").Value ' Status Geral
+    wsBanco.Cells(ultimaLinha, 6).Value = wsForm.Range("B6").Value ' Percentual Concluído
+    wsBanco.Cells(ultimaLinha, 7).Value = wsForm.Range("B7").Value ' Riscos Identificados
+    wsBanco.Cells(ultimaLinha, 8).Value = wsForm.Range("B8").Value ' Data de Atualização
+    
+    ' Limpar formulário
+    wsForm.Range("B2:B8").ClearContents
+    
+    MsgBox "Registro salvo com sucesso!", vbInformation
+End Sub
+
+
+Sub EditarRegistro()
+    Dim wsBanco As Worksheet
+    Dim wsForm As Worksheet
+    Dim buscaID As Long
+    Dim linhaEncontrada As Range
+    
+    Set wsBanco = ThisWorkbook.Sheets("Banco de Dados")
+    Set wsForm = ThisWorkbook.Sheets("Entrada de Dados")
+    
+    buscaID = wsForm.Range("B1").Value ' ID para buscar
+    
+    ' Procurar o ID no banco de dados
+    Set linhaEncontrada = wsBanco.Columns(1).Find(What:=buscaID, LookIn:=xlValues, LookAt:=xlWhole)
+    
+    If Not linhaEncontrada Is Nothing Then
+        Dim linha As Long
+        linha = linhaEncontrada.Row
+        
+        ' Preencher formulário com os dados encontrados
+        wsForm.Range("B2").Value = wsBanco.Cells(linha, 2).Value ' Nome do Projeto
+        wsForm.Range("B3").Value = wsBanco.Cells(linha, 3).Value ' Código do Projeto
+        wsForm.Range("B4").Value = wsBanco.Cells(linha, 4).Value ' Gerente do Projeto
+        wsForm.Range("B5").Value = wsBanco.Cells(linha, 5).Value ' Status Geral
+        wsForm.Range("B6").Value = wsBanco.Cells(linha, 6).Value ' Percentual Concluído
+        wsForm.Range("B7").Value = wsBanco.Cells(linha, 7).Value ' Riscos Identificados
+        wsForm.Range("B8").Value = wsBanco.Cells(linha, 8).Value ' Data de Atualização
+        
+        MsgBox "Registro carregado para edição!", vbInformation
+    Else
+        MsgBox "ID não encontrado!", vbExclamation
+    End If
+End Sub
+
+Layout Proposto
+Campo	Entrada de Dados
+Nome do Projeto	[Campo de entrada de texto]
+Código do Projeto	[Campo de entrada de texto]
+Gerente do Projeto	[Lista suspensa]
+Status Geral	[Lista suspensa]
+Percentual Concluído (%)	[Campo de entrada numérico]
+Riscos Identificados	[Campo de texto grande]
+Data de Atualização	=HOJE() (preenchido automático)
+          
+          
