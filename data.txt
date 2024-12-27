@@ -1,4 +1,4 @@
-Sub CreatePivotTableWithVariations(wsSource As Worksheet)
+Sub CreatePivotTableWithVariation(wsSource As Worksheet)
     Dim wb As Workbook
     Dim wsPivot As Worksheet
     Dim ptCache As PivotCache
@@ -7,29 +7,19 @@ Sub CreatePivotTableWithVariations(wsSource As Worksheet)
     Dim pivotSheetName As String
     Dim lastRow As Long
     Dim lastCol As Long
+    Dim variationColumn As Range
     Dim dataBodyRange As Range
+    Dim ptDestination As Range
     
     ' Obtém o Workbook associado à Worksheet
     Set wb = wsSource.Parent
     
-    ' Define o intervalo de dados e adiciona colunas de variação
+    ' Define o intervalo de dados
     With wsSource
         lastRow = .Cells(.Rows.Count, "A").End(xlUp).Row
         lastCol = .Cells(1, .Columns.Count).End(xlToLeft).Column
         Set dataRange = .Range("A1").Resize(lastRow, lastCol)
-        
-        ' Adiciona colunas de variação (Cálculo entre meses)
-        Dim i As Integer
-        For i = 2 To lastCol - 1 ' Considera que os meses estão nas colunas da 2ª à última
-            .Cells(1, lastCol + i - 1).Value = "Var_" & .Cells(1, i).Value
-            .Range(.Cells(2, lastCol + i - 1), .Cells(lastRow, lastCol + i - 1)).FormulaR1C1 = _
-                "=IFERROR((RC[-1]-RC[-2])/RC[-2],0)"
-        Next i
     End With
-    
-    ' Atualiza o intervalo de dados com as colunas de variação
-    lastCol = wsSource.Cells(1, wsSource.Columns.Count).End(xlToLeft).Column
-    Set dataRange = wsSource.Range("A1").Resize(lastRow, lastCol)
     
     ' Cria ou recria a aba "PivotTabela"
     pivotSheetName = "PivotTabela"
@@ -42,6 +32,9 @@ Sub CreatePivotTableWithVariations(wsSource As Worksheet)
     Set wsPivot = wb.Sheets.Add
     wsPivot.Name = pivotSheetName
     
+    ' Define o destino inicial da PivotTable
+    Set ptDestination = wsPivot.Range("A3")
+    
     ' Cria o cache da PivotTable
     Set ptCache = wb.PivotCaches.Create( _
         SourceType:=xlDatabase, _
@@ -49,7 +42,7 @@ Sub CreatePivotTableWithVariations(wsSource As Worksheet)
     
     ' Cria a PivotTable na aba "PivotTabela"
     Set pt = ptCache.CreatePivotTable( _
-        TableDestination:=wsPivot.Range("A3"), _
+        TableDestination:=ptDestination, _
         TableName:="PivotTable1")
     
     ' Configura os campos da PivotTable
@@ -57,25 +50,30 @@ Sub CreatePivotTableWithVariations(wsSource As Worksheet)
         .PivotFields("Months").Orientation = xlColumnField
         .PivotFields("Vendor").Orientation = xlRowField
         .PivotFields("Forecast").Orientation = xlPageField
-        
-        ' Adiciona os campos de valores das variações
-        Dim j As Integer
-        For j = lastCol - lastCol + 2 To lastCol
-            With .PivotFields(wsSource.Cells(1, j).Value)
-                .Orientation = xlDataField
-                .Function = xlSum
-                .NumberFormat = "0.00%"
-            End With
-        Next j
+        .PivotFields("FrancoValue").Orientation = xlDataField
+        .PivotFields("FrancoValue").Function = xlSum
+        .PivotFields("FrancoValue").NumberFormat = "#,##0.00"
     End With
     
-    ' Aplica a formatação condicional às variações
+    ' Adiciona uma coluna de variação diretamente na PivotTable
+    With pt
+        With .CalculatedFields.Add("MonthlyVariation", _
+                "=IFERROR((FrancoValue - (FrancoValue[-1])) / (FrancoValue[-1]), 0)")
+            .NumberFormat = "0.00%"
+        End With
+        .AddDataField pt.PivotFields("MonthlyVariation"), "MonthlyVariation", xlSum
+    End With
+    
+    ' Aplica a formatação condicional à coluna de variação
     On Error Resume Next
     Set dataBodyRange = pt.DataBodyRange
     On Error GoTo 0
     
     If Not dataBodyRange Is Nothing Then
-        With dataBodyRange.FormatConditions
+        Dim variationRange As Range
+        Set variationRange = dataBodyRange.Columns(dataBodyRange.Columns.Count)
+        
+        With variationRange.FormatConditions
             ' Remove condições existentes
             .Delete
             
@@ -105,7 +103,7 @@ Sub CreatePivotTableWithVariations(wsSource As Worksheet)
         End With
     End If
     
-    MsgBox "PivotTable criada e formatada na aba: " & pivotSheetName, vbInformation
+    MsgBox "PivotTable criada com coluna de variação formatada na aba: " & pivotSheetName, vbInformation
 End Sub
 
 Sub CallCreatePivotTable()
@@ -115,5 +113,5 @@ Sub CallCreatePivotTable()
     Set wsSource = ThisWorkbook.Sheets("NomeDaPlanilhaDeOrigem") ' Substitua pelo nome correto da planilha
     
     ' Chama a macro para criar a PivotTable
-    CreatePivotTableWithVariations wsSource
+    CreatePivotTableWithVariation wsSource
 End Sub
