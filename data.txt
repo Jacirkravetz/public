@@ -5,6 +5,7 @@ Sub CreatePivotTableInWorksheet(wsSource As Worksheet)
     Dim pt As PivotTable
     Dim dataRange As Range
     Dim pivotSheetName As String
+    Dim pivotField As PivotField
     
     ' Obtém o Workbook associado à Worksheet
     Set wb = wsSource.Parent
@@ -35,15 +36,17 @@ Sub CreatePivotTableInWorksheet(wsSource As Worksheet)
         TableDestination:=wsPivot.Range("A3"), _
         TableName:="PivotTable1")
     
-    ' Configura a PivotTable
+    ' Configura os campos da PivotTable
     With pt
         .PivotFields("Months").Orientation = xlColumnField
         .PivotFields("Vendor").Orientation = xlRowField
         .PivotFields("Forecast").Orientation = xlPageField
-        .PivotFields("FrancoValue").Orientation = xlDataField
-        .PivotFields("FrancoValue").Function = xlSum
-        .PivotFields("FrancoValue").NumberFormat = "#,##0.00"
-        .RefreshTable
+        
+        ' Adiciona o campo de valores "FrancoValue"
+        Set pivotField = .PivotFields("FrancoValue")
+        pivotField.Orientation = xlDataField
+        pivotField.Function = xlSum
+        pivotField.NumberFormat = "#,##0.00"
     End With
     
     MsgBox "PivotTable criada na aba: " & pivotSheetName, vbInformation
