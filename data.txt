@@ -1,4 +1,4 @@
-Sub CreatePivotTable(sheetName As String)
+Sub CreatePivotTableInWorkbook(wb As Workbook, sourceSheetName As String)
     Dim wsSource As Worksheet
     Dim wsPivot As Worksheet
     Dim ptCache As PivotCache
@@ -8,32 +8,32 @@ Sub CreatePivotTable(sheetName As String)
     
     ' Defina a planilha de origem
     On Error Resume Next
-    Set wsSource = ThisWorkbook.Sheets(sheetName)
+    Set wsSource = wb.Sheets(sourceSheetName)
     On Error GoTo 0
     
     If wsSource Is Nothing Then
-        MsgBox "Planilha '" & sheetName & "' não encontrada.", vbExclamation
+        MsgBox "Planilha '" & sourceSheetName & "' não encontrada no Workbook especificado.", vbExclamation
         Exit Sub
     End If
     
     ' Defina o intervalo de dados para a PivotTable
     With wsSource
-        Set dataRange = .Range("A1").CurrentRegion ' Considera a região atual como intervalo de dados
+        Set dataRange = .Range("A1:AB" & .Cells(.Rows.Count, "A").End(xlUp).Row) ' Dados de A até AB
     End With
     
-    ' Crie uma nova planilha para a PivotTable
-    pivotSheetName = "Pivot_" & sheetName
+    ' Crie uma nova planilha chamada "PivotTabela" no Workbook
+    pivotSheetName = "PivotTabela"
     On Error Resume Next
     Application.DisplayAlerts = False
-    Worksheets(pivotSheetName).Delete ' Exclui a planilha se já existir
+    wb.Sheets(pivotSheetName).Delete ' Exclui a planilha se já existir
     Application.DisplayAlerts = True
     On Error GoTo 0
     
-    Set wsPivot = ThisWorkbook.Sheets.Add
+    Set wsPivot = wb.Sheets.Add
     wsPivot.Name = pivotSheetName
     
     ' Crie o cache da PivotTable
-    Set ptCache = ThisWorkbook.PivotCaches.Create( _
+    Set ptCache = wb.PivotCaches.Create( _
         SourceType:=xlDatabase, _
         SourceData:=dataRange)
     
@@ -57,4 +57,11 @@ Sub CreatePivotTable(sheetName As String)
     End With
     
     MsgBox "PivotTable criada na aba: " & pivotSheetName, vbInformation
+End Sub
+
+
+Sub CallCreatePivotTable()
+    Dim wb As Workbook
+    Set wb = ThisWorkbook ' Altere para o Workbook desejado, se necessário
+    Call CreatePivotTableInWorkbook(wb, "NomeDaPlanilhaDeOrigem")
 End Sub
