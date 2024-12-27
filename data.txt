@@ -1,27 +1,20 @@
-Sub CreatePivotTableInWorkbook(wb As Workbook, sourceSheetName As String)
-    Dim wsSource As Worksheet
+Sub CreatePivotTableInWorksheet(wsSource As Worksheet)
+    Dim wb As Workbook
     Dim wsPivot As Worksheet
     Dim ptCache As PivotCache
     Dim pt As PivotTable
     Dim dataRange As Range
     Dim pivotSheetName As String
     
-    ' Defina a planilha de origem
-    On Error Resume Next
-    Set wsSource = wb.Sheets(sourceSheetName)
-    On Error GoTo 0
+    ' Obtém o Workbook associado à Worksheet
+    Set wb = wsSource.Parent
     
-    If wsSource Is Nothing Then
-        MsgBox "Planilha '" & sourceSheetName & "' não encontrada no Workbook especificado.", vbExclamation
-        Exit Sub
-    End If
-    
-    ' Defina o intervalo de dados para a PivotTable
+    ' Define o intervalo de dados de A até AB
     With wsSource
-        Set dataRange = .Range("A1:AB" & .Cells(.Rows.Count, "A").End(xlUp).Row) ' Dados de A até AB
+        Set dataRange = .Range("A1:AB" & .Cells(.Rows.Count, "A").End(xlUp).Row)
     End With
     
-    ' Crie uma nova planilha chamada "PivotTabela" no Workbook
+    ' Cria ou recria a aba "PivotTabela"
     pivotSheetName = "PivotTabela"
     On Error Resume Next
     Application.DisplayAlerts = False
@@ -32,36 +25,36 @@ Sub CreatePivotTableInWorkbook(wb As Workbook, sourceSheetName As String)
     Set wsPivot = wb.Sheets.Add
     wsPivot.Name = pivotSheetName
     
-    ' Crie o cache da PivotTable
+    ' Cria o cache da PivotTable
     Set ptCache = wb.PivotCaches.Create( _
         SourceType:=xlDatabase, _
         SourceData:=dataRange)
     
-    ' Crie a PivotTable na nova planilha
+    ' Cria a PivotTable na aba "PivotTabela"
     Set pt = ptCache.CreatePivotTable( _
         TableDestination:=wsPivot.Range("A3"), _
         TableName:="PivotTable1")
     
-    ' Configure a PivotTable
+    ' Configura a PivotTable
     With pt
-        ' Adicione as colunas, linhas, filtros e valores
         .PivotFields("Months").Orientation = xlColumnField
         .PivotFields("Vendor").Orientation = xlRowField
         .PivotFields("Forecast").Orientation = xlPageField
         .PivotFields("FrancoValue").Orientation = xlDataField
         .PivotFields("FrancoValue").Function = xlSum
         .PivotFields("FrancoValue").NumberFormat = "#,##0.00"
-        
-        ' Atualize a tabela dinâmica
         .RefreshTable
     End With
     
     MsgBox "PivotTable criada na aba: " & pivotSheetName, vbInformation
 End Sub
 
-
 Sub CallCreatePivotTable()
-    Dim wb As Workbook
-    Set wb = ThisWorkbook ' Altere para o Workbook desejado, se necessário
-    Call CreatePivotTableInWorkbook(wb, "NomeDaPlanilhaDeOrigem")
+    Dim wsSource As Worksheet
+    
+    ' Define a planilha de origem
+    Set wsSource = ThisWorkbook.Sheets("NomeDaPlanilhaDeOrigem") ' Substitua pelo nome correto da planilha
+    
+    ' Chama a macro para criar a PivotTable
+    CreatePivotTableInWorksheet wsSource
 End Sub
