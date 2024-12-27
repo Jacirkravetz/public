@@ -1,161 +1,60 @@
-@page "/relatorios"
-
-<h2>Geração de Relatórios</h2>
-<p>Utilize os campos abaixo para gerar relatórios personalizados:</p>
-
-<div class="report-form">
-    <div class="form-group">
-        <label for="dataInicio">Data Início</label>
-        <input type="date" id="dataInicio" @bind="DataInicio" class="form-control" />
-    </div>
-
-    <div class="form-group">
-        <label for="dataFim">Data Fim</label>
-        <input type="date" id="dataFim" @bind="DataFim" class="form-control" />
-    </div>
-
-    <div class="form-group">
-        <label for="codigoCliente">Código do Cliente</label>
-        <input type="text" id="codigoCliente" @bind="CodigoCliente" class="form-control" placeholder="Insira o código do cliente" />
-    </div>
-
-    <div class="button-group">
-        <button @onclick="GerarRelatorio" class="btn btn-primary">Gerar Relatório</button>
-        @if (!string.IsNullOrEmpty(RelatorioPath))
-        {
-            <a href="@RelatorioPath" class="btn btn-success" download>Download Relatório</a>
-        }
-    </div>
-
-    @if (!string.IsNullOrEmpty(MensagemErro))
-    {
-        <div class="error-message">@MensagemErro</div>
-    }
-</div>
-
-@code {
-    private DateTime? DataInicio { get; set; }
-    private DateTime? DataFim { get; set; }
-    private string CodigoCliente { get; set; }
-    private string RelatorioPath { get; set; }
-    private string MensagemErro { get; set; }
-
-    private void GerarRelatorio()
-    {
-        if (DataInicio == null || DataFim == null || string.IsNullOrEmpty(CodigoCliente))
-        {
-            MensagemErro = "Todos os campos são obrigatórios!";
-            return;
-        }
-
-        if (DataInicio > DataFim)
-        {
-            MensagemErro = "A data início não pode ser maior que a data fim!";
-            return;
-        }
-
-        // Lógica de geração do relatório
-        RelatorioPath = $"/downloads/relatorio-{Guid.NewGuid()}.pdf";
-        MensagemErro = string.Empty;
-    }
-}
-
-
-
-/* Estilo Geral */
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #333;
-    background-color: #f9f9f9;
-}
-
-/* Formulário de Relatórios */
-.report-form {
-    max-width: 600px;
-    margin: 30px auto;
-    padding: 20px;
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-.report-form .form-group {
-    margin-bottom: 15px;
-}
-
-.report-form label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: #555;
-}
-
-.report-form .form-control {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    font-size: 1rem;
-    color: #333;
-}
-
-.report-form .form-control:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
-}
-
-.report-form .button-group {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.report-form .btn {
-    padding: 10px 15px;
-    font-size: 1rem;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.report-form .btn-primary {
-    background-color: #007bff;
-    color: white;
-}
-
-.report-form .btn-primary:hover {
-    background-color: #0056b3;
-}
-
-.report-form .btn-success {
-    background-color: #28a745;
-    color: white;
-}
-
-.report-form .btn-success:hover {
-    background-color: #218838;
-}
-
-.report-form .error-message {
-    margin-top: 10px;
-    color: #dc3545;
-    font-weight: bold;
-    font-size: 0.9rem;
-}
-
-
-app.UseStaticFiles(); // Permite servir arquivos estáticos
-
-// Simula geração de relatórios
-app.MapGet("/downloads/{filename}", (string filename) =>
-{
-    var filePath = Path.Combine("wwwroot", "downloads", filename);
-    if (File.Exists(filePath))
-    {
-        return Results.File(filePath, "application/pdf", filename);
-    }
-    return Results.NotFound();
-});
-
-
+Sub CreatePivotTable(sheetName As String)
+    Dim wsSource As Worksheet
+    Dim wsPivot As Worksheet
+    Dim ptCache As PivotCache
+    Dim pt As PivotTable
+    Dim dataRange As Range
+    Dim pivotSheetName As String
+    
+    ' Defina a planilha de origem
+    On Error Resume Next
+    Set wsSource = ThisWorkbook.Sheets(sheetName)
+    On Error GoTo 0
+    
+    If wsSource Is Nothing Then
+        MsgBox "Planilha '" & sheetName & "' não encontrada.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Defina o intervalo de dados para a PivotTable
+    With wsSource
+        Set dataRange = .Range("A1").CurrentRegion ' Considera a região atual como intervalo de dados
+    End With
+    
+    ' Crie uma nova planilha para a PivotTable
+    pivotSheetName = "Pivot_" & sheetName
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    Worksheets(pivotSheetName).Delete ' Exclui a planilha se já existir
+    Application.DisplayAlerts = True
+    On Error GoTo 0
+    
+    Set wsPivot = ThisWorkbook.Sheets.Add
+    wsPivot.Name = pivotSheetName
+    
+    ' Crie o cache da PivotTable
+    Set ptCache = ThisWorkbook.PivotCaches.Create( _
+        SourceType:=xlDatabase, _
+        SourceData:=dataRange)
+    
+    ' Crie a PivotTable na nova planilha
+    Set pt = ptCache.CreatePivotTable( _
+        TableDestination:=wsPivot.Range("A3"), _
+        TableName:="PivotTable1")
+    
+    ' Configure a PivotTable
+    With pt
+        ' Adicione as colunas, linhas, filtros e valores
+        .PivotFields("Months").Orientation = xlColumnField
+        .PivotFields("Vendor").Orientation = xlRowField
+        .PivotFields("Forecast").Orientation = xlPageField
+        .PivotFields("FrancoValue").Orientation = xlDataField
+        .PivotFields("FrancoValue").Function = xlSum
+        .PivotFields("FrancoValue").NumberFormat = "#,##0.00"
+        
+        ' Atualize a tabela dinâmica
+        .RefreshTable
+    End With
+    
+    MsgBox "PivotTable criada na aba: " & pivotSheetName, vbInformation
+End Sub
