@@ -8,7 +8,6 @@ Sub CreatePivotTableWithVariation(wsSource As Worksheet)
     Dim lastRow As Long
     Dim lastCol As Long
     Dim variationColumn As Range
-    Dim dataBodyRange As Range
     Dim ptDestination As Range
     
     ' Obtém o Workbook associado à Worksheet
@@ -18,7 +17,15 @@ Sub CreatePivotTableWithVariation(wsSource As Worksheet)
     With wsSource
         lastRow = .Cells(.Rows.Count, "A").End(xlUp).Row
         lastCol = .Cells(1, .Columns.Count).End(xlToLeft).Column
-        Set dataRange = .Range("A1").Resize(lastRow, lastCol)
+        
+        ' Adiciona uma coluna de variação na origem
+        If .Cells(1, lastCol + 1).Value <> "MonthlyVariation" Then
+            .Cells(1, lastCol + 1).Value = "MonthlyVariation"
+            .Range(.Cells(2, lastCol + 1), .Cells(lastRow, lastCol + 1)).Formula = _
+                "=IFERROR((RC[-1]-R[-1]C[-1])/R[-1]C[-1],0)"
+        End If
+        
+        Set dataRange = .Range("A1").Resize(lastRow, lastCol + 1)
     End With
     
     ' Cria ou recria a aba "PivotTabela"
@@ -53,18 +60,15 @@ Sub CreatePivotTableWithVariation(wsSource As Worksheet)
         .PivotFields("FrancoValue").Orientation = xlDataField
         .PivotFields("FrancoValue").Function = xlSum
         .PivotFields("FrancoValue").NumberFormat = "#,##0.00"
-    End With
-    
-    ' Adiciona uma coluna de variação diretamente na PivotTable
-    With pt
-        With .CalculatedFields.Add("MonthlyVariation", _
-                "=IFERROR((FrancoValue - (FrancoValue[-1])) / (FrancoValue[-1]), 0)")
-            .NumberFormat = "0.00%"
-        End With
-        .AddDataField pt.PivotFields("MonthlyVariation"), "MonthlyVariation", xlSum
+        
+        ' Adiciona a variação na PivotTable
+        .PivotFields("MonthlyVariation").Orientation = xlDataField
+        .PivotFields("MonthlyVariation").Function = xlAverage
+        .PivotFields("MonthlyVariation").NumberFormat = "0.00%"
     End With
     
     ' Aplica a formatação condicional à coluna de variação
+    Dim dataBodyRange As Range
     On Error Resume Next
     Set dataBodyRange = pt.DataBodyRange
     On Error GoTo 0
