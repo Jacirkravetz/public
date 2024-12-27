@@ -6,6 +6,7 @@ Sub CreatePivotTableInWorksheet(wsSource As Worksheet)
     Dim dataRange As Range
     Dim pivotSheetName As String
     Dim pivotField As PivotField
+    Dim dataBodyRange As Range
     
     ' Obtém o Workbook associado à Worksheet
     Set wb = wsSource.Parent
@@ -49,7 +50,43 @@ Sub CreatePivotTableInWorksheet(wsSource As Worksheet)
         pivotField.NumberFormat = "#,##0.00"
     End With
     
-    MsgBox "PivotTable criada na aba: " & pivotSheetName, vbInformation
+    ' Aplica a formatação condicional
+    On Error Resume Next
+    Set dataBodyRange = pt.DataBodyRange
+    On Error GoTo 0
+    
+    If Not dataBodyRange Is Nothing Then
+        With dataBodyRange.FormatConditions
+            ' Remove condições existentes
+            .Delete
+            
+            ' Regra: Variação = 0% (Verde)
+            .Add Type:=xlCellValue, Operator:=xlEqual, Formula1:="=0"
+            With .Item(.Count)
+                .Interior.Color = RGB(0, 255, 0)
+            End With
+            
+            ' Regra: Variação entre 1% e 15% (Amarelo)
+            .Add Type:=xlCellValue, Operator:=xlBetween, Formula1:="=0.01", Formula2:="=0.15"
+            With .Item(.Count)
+                .Interior.Color = RGB(255, 255, 0)
+            End With
+            
+            ' Regra: Variação entre 15% e 50% (Laranja)
+            .Add Type:=xlCellValue, Operator:=xlBetween, Formula1:="=0.15", Formula2:="=0.5"
+            With .Item(.Count)
+                .Interior.Color = RGB(255, 165, 0)
+            End With
+            
+            ' Regra: Variação acima de 50% (Vermelho)
+            .Add Type:=xlCellValue, Operator:=xlGreater, Formula1:="=0.5"
+            With .Item(.Count)
+                .Interior.Color = RGB(255, 0, 0)
+            End With
+        End With
+    End If
+    
+    MsgBox "PivotTable criada e formatada na aba: " & pivotSheetName, vbInformation
 End Sub
 
 Sub CallCreatePivotTable()
