@@ -1,16 +1,44 @@
-<configuration>
-  <system.webServer>
-    <rewrite>
-      <rules>
-        <rule name="Blazor routing" stopProcessing="true">
-          <match url=".*" />
-          <conditions logicalGrouping="MatchAll">
-            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
-            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
-          </conditions>
-          <action type="Rewrite" url="/index.html" />
-        </rule>
-      </rules>
-    </rewrite>
-  </system.webServer>
-</configuration>
+@page "/logout"
+@inject NavigationManager Navigation
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider
+@inject IServiceProvider ServiceProvider
+
+<h3>Logout</h3>
+<p>Estamos processando sua solicitação de logout...</p>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await LogoutAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            // Desconecta o usuário do Azure AD
+            var signOutManager = ServiceProvider.GetService(typeof(Microsoft.AspNetCore.Authentication.SignOutManager)) 
+                as Microsoft.AspNetCore.Authentication.SignOutManager;
+
+            if (signOutManager != null)
+            {
+                await signOutManager.SignOutAsync();
+            }
+
+            // Redefine o estado de autenticação local
+            var customAuthStateProvider = AuthenticationStateProvider as CustomAuthenticationStateProvider;
+            if (customAuthStateProvider != null)
+            {
+                await customAuthStateProvider.LogoutAsync();
+            }
+
+            // Redireciona o usuário para a página inicial
+            Navigation.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Erro ao fazer logout: {ex.Message}");
+            // Mensagem ou lógica adicional de fallback
+        }
+    }
+}
