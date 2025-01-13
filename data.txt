@@ -1,34 +1,10 @@
-@page "/logout"
-@inject NavigationManager Navigation
-@inject SignOutSessionStateManager SignOutManager
-@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider
-
-<h3>Logout</h3>
-<p>Estamos processando sua solicitação de logout...</p>
-
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        await ProcessLogout();
-    }
-
-    private async Task ProcessLogout()
-    {
-        try
-        {
-            // Finaliza a sessão local
-            if (AuthStateProvider is IHostEnvironmentAuthenticationStateProvider hostAuthProvider)
-            {
-                hostAuthProvider.SignOut();
-            }
-
-            // Redireciona para o logout do Azure AD
-            await SignOutManager.SetSignOutState();
-            Navigation.NavigateTo("MicrosoftIdentity/Account/SignOut", forceLoad: true);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Erro durante o logout: {ex.Message}");
-        }
-    }
-}
+Status = 
+VAR Hoje = TODAY() 
+RETURN
+    SWITCH(
+        TRUE(),
+        'Tabela'[Fim] < Hoje, "Finalizado",
+        'Tabela'[Inicio] > Hoje, "Futura",
+        'Tabela'[Inicio] <= Hoje && 'Tabela'[Fim] >= Hoje, "Em progresso",
+        "Sem Informação"
+    )
