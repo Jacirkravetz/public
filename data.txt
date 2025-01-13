@@ -1,7 +1,7 @@
 @page "/logout"
 @inject NavigationManager Navigation
-@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider
-@inject IServiceProvider ServiceProvider
+@inject SignOutSessionStateManager SignOutManager
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider
 
 <h3>Logout</h3>
 <p>Estamos processando sua solicitação de logout...</p>
@@ -9,36 +9,26 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        await LogoutAsync();
+        await ProcessLogout();
     }
 
-    private async Task LogoutAsync()
+    private async Task ProcessLogout()
     {
         try
         {
-            // Desconecta o usuário do Azure AD
-            var signOutManager = ServiceProvider.GetService(typeof(Microsoft.AspNetCore.Authentication.SignOutManager)) 
-                as Microsoft.AspNetCore.Authentication.SignOutManager;
-
-            if (signOutManager != null)
+            // Finaliza a sessão local
+            if (AuthStateProvider is IHostEnvironmentAuthenticationStateProvider hostAuthProvider)
             {
-                await signOutManager.SignOutAsync();
+                hostAuthProvider.SignOut();
             }
 
-            // Redefine o estado de autenticação local
-            var customAuthStateProvider = AuthenticationStateProvider as CustomAuthenticationStateProvider;
-            if (customAuthStateProvider != null)
-            {
-                await customAuthStateProvider.LogoutAsync();
-            }
-
-            // Redireciona o usuário para a página inicial
-            Navigation.NavigateTo("/", true);
+            // Redireciona para o logout do Azure AD
+            await SignOutManager.SetSignOutState();
+            Navigation.NavigateTo("MicrosoftIdentity/Account/SignOut", forceLoad: true);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Erro ao fazer logout: {ex.Message}");
-            // Mensagem ou lógica adicional de fallback
+            Console.Error.WriteLine($"Erro durante o logout: {ex.Message}");
         }
     }
 }
