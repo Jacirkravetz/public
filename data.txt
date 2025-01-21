@@ -1,26 +1,10 @@
-  using System;
-using System.IO;
-using System.Threading.Tasks;
-using iText.Kernel.Pdf;
-using iText.Layout;
-using iText.Layout.Element;
-using iText.Layout.Properties;
-using iText.IO.Font;
-using iText.Kernel.Font;
-
-// Carrega a fonte Frutiger
-        string fontPath = Path.Combine(AppContext.BaseDirectory, "fonts", "FrutigerLTStd-Roman.otf"); // Certifique-se que a fonte está no diretório correto
-        if (!File.Exists(fontPath))
-        {
-            throw new FileNotFoundException("Fonte Frutiger não encontrada no diretório especificado.");
-        }
-
-        PdfFont frutigerFont = PdfFontFactory.CreateFont(fontPath, PdfEncodings.WINANSI, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+VariaçãoPercentualDEV = 
+DIVIDE(
+    [EsforçoRealizadoDEV] - SUM('Tarefas'[EsforçoPrevistoDEV]),
+    SUM('Tarefas'[EsforçoPrevistoDEV]),
+    0
+) * 100
 
 
- document.Add(new Paragraph("Relatório de Vendas")
-                .SetFont(frutigerFont)
-                .SetFontSize(18)
-                .SetBold()
-                .SetTextAlignment(TextAlignment.CENTER)
-                .SetMarginBottom(20));
+EsforçoRestanteDEV = 
+SUM('Tarefas'[EsforçoPrevistoDEV]) - [EsforçoRealizadoDEV]
