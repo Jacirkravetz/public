@@ -1,10 +1,41 @@
-VariaçãoPercentualDEV = 
-DIVIDE(
-    [EsforçoRealizadoDEV] - SUM('Tarefas'[EsforçoPrevistoDEV]),
-    SUM('Tarefas'[EsforçoPrevistoDEV]),
-    0
-) * 100
+# Defina a lista de endpoints
+$endpoints = @(
+    "https://jsonplaceholder.typicode.com/posts/1",
+    "https://jsonplaceholder.typicode.com/posts/2",
+    "https://jsonplaceholder.typicode.com/posts/3",
+    "https://jsonplaceholder.typicode.com/posts/4",
+    "https://jsonplaceholder.typicode.com/posts/5"
+)
 
+# Armazena os jobs em uma lista
+$jobs = @()
 
-EsforçoRestanteDEV = 
-SUM('Tarefas'[EsforçoPrevistoDEV]) - [EsforçoRealizadoDEV]
+# Inicia os jobs para chamadas paralelas
+foreach ($endpoint in $endpoints) {
+    $jobs += Start-Job -ScriptBlock {
+        param($url)
+        try {
+            # Executa a requisição GET
+            $response = Invoke-WebRequest -Uri $url -Method GET -UseBasicParsing
+            # Retorna o conteúdo como JSON
+            $response.Content
+        } catch {
+            # Trata erros e retorna mensagem
+            "Erro ao acessar $url: $_"
+        }
+    } -ArgumentList $endpoint
+}
+
+# Aguarda todos os jobs terminarem e coleta os resultados
+$results = @()
+foreach ($job in $jobs) {
+    $results += Receive-Job -Job $job -Wait
+}
+
+# Remove os jobs concluídos
+Remove-Job -Job $jobs
+
+# Exibe os resultados
+foreach ($result in $results) {
+    Write-Output $result
+}
