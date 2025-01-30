@@ -1,41 +1,32 @@
-# Defina a lista de endpoints
-$endpoints = @(
-    "https://jsonplaceholder.typicode.com/posts/1",
-    "https://jsonplaceholder.typicode.com/posts/2",
-    "https://jsonplaceholder.typicode.com/posts/3",
-    "https://jsonplaceholder.typicode.com/posts/4",
-    "https://jsonplaceholder.typicode.com/posts/5"
-)
+DECLARE 
+    v_start_time TIMESTAMP;
+    v_end_time TIMESTAMP;
+    v_elapsed_time INTERVAL DAY TO SECOND;
+BEGIN
+    -- Captura o horário inicial
+    v_start_time := SYSTIMESTAMP;
+    
+    -- Criando a tabela temporária
+    EXECUTE IMMEDIATE 'CREATE GLOBAL TEMPORARY TABLE TMP_CLIENTES_SINACOR (
+        CNPJ VARCHAR2(20),
+        CONTA VARCHAR2(20),
+        STATUS VARCHAR2(10)
+    ) ON COMMIT PRESERVE ROWS';
+    
+    -- Inserindo os dados na tabela temporária
+    INSERT INTO TMP_CLIENTES_SINACOR (CNPJ, CONTA, STATUS)
+    SELECT CNPJ, CONTA, STATUS FROM VW_CLIENTES_SINACOR;
 
-# Armazena os jobs em uma lista
-$jobs = @()
+    -- Commit para confirmar a transação
+    COMMIT;
 
-# Inicia os jobs para chamadas paralelas
-foreach ($endpoint in $endpoints) {
-    $jobs += Start-Job -ScriptBlock {
-        param($url)
-        try {
-            # Executa a requisição GET
-            $response = Invoke-WebRequest -Uri $url -Method GET -UseBasicParsing
-            # Retorna o conteúdo como JSON
-            $response.Content
-        } catch {
-            # Trata erros e retorna mensagem
-            "Erro ao acessar $url: $_"
-        }
-    } -ArgumentList $endpoint
-}
-
-# Aguarda todos os jobs terminarem e coleta os resultados
-$results = @()
-foreach ($job in $jobs) {
-    $results += Receive-Job -Job $job -Wait
-}
-
-# Remove os jobs concluídos
-Remove-Job -Job $jobs
-
-# Exibe os resultados
-foreach ($result in $results) {
-    Write-Output $result
-}
+    -- Captura o horário final
+    v_end_time := SYSTIMESTAMP;
+    
+    -- Calcula o tempo decorrido
+    v_elapsed_time := v_end_time - v_start_time;
+    
+    -- Exibe o tempo total
+    DBMS_OUTPUT.PUT_LINE('Tempo total: ' || v_elapsed_time);
+END;
+/
