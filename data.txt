@@ -1,32 +1,22 @@
-DECLARE 
-    v_start_time TIMESTAMP;
-    v_end_time TIMESTAMP;
-    v_elapsed_time INTERVAL DAY TO SECOND;
+DECLARE
+    v_count NUMBER;
 BEGIN
-    -- Captura o horário inicial
-    v_start_time := SYSTIMESTAMP;
-    
-    -- Criando a tabela temporária
-    EXECUTE IMMEDIATE 'CREATE GLOBAL TEMPORARY TABLE TMP_CLIENTES_SINACOR (
-        CNPJ VARCHAR2(20),
-        CONTA VARCHAR2(20),
-        STATUS VARCHAR2(10)
-    ) ON COMMIT PRESERVE ROWS';
-    
-    -- Inserindo os dados na tabela temporária
-    INSERT INTO TMP_CLIENTES_SINACOR (CNPJ, CONTA, STATUS)
-    SELECT CNPJ, CONTA, STATUS FROM VW_CLIENTES_SINACOR;
+    -- Verifica se a tabela temporária já existe no banco de dados
+    SELECT COUNT(*) INTO v_count 
+    FROM ALL_TABLES 
+    WHERE TABLE_NAME = 'TMP_CLIENTES_SINACOR' AND OWNER = 'SEU_ESQUEMA';
 
-    -- Commit para confirmar a transação
-    COMMIT;
-
-    -- Captura o horário final
-    v_end_time := SYSTIMESTAMP;
-    
-    -- Calcula o tempo decorrido
-    v_elapsed_time := v_end_time - v_start_time;
-    
-    -- Exibe o tempo total
-    DBMS_OUTPUT.PUT_LINE('Tempo total: ' || v_elapsed_time);
+    -- Se a tabela não existir, cria
+    IF v_count = 0 THEN
+        EXECUTE IMMEDIATE 'CREATE GLOBAL TEMPORARY TABLE TMP_CLIENTES_SINACOR (
+            CNPJ VARCHAR2(20),
+            CONTA VARCHAR2(20),
+            STATUS VARCHAR2(10)
+        ) ON COMMIT PRESERVE ROWS';
+        
+        DBMS_OUTPUT.PUT_LINE('Tabela TMP_CLIENTES_SINACOR criada.');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Tabela TMP_CLIENTES_SINACOR já existe.');
+    END IF;
 END;
 /
