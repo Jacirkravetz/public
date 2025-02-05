@@ -1,22 +1,211 @@
-DECLARE
-    v_count NUMBER;
-BEGIN
-    -- Verifica se a tabela temporária já existe no banco de dados
-    SELECT COUNT(*) INTO v_count 
-    FROM ALL_TABLES 
-    WHERE TABLE_NAME = 'TMP_CLIENTES_SINACOR' AND OWNER = 'SEU_ESQUEMA';
+using System;
+using System.ComponentModel.DataAnnotations;
 
-    -- Se a tabela não existir, cria
-    IF v_count = 0 THEN
-        EXECUTE IMMEDIATE 'CREATE GLOBAL TEMPORARY TABLE TMP_CLIENTES_SINACOR (
-            CNPJ VARCHAR2(20),
-            CONTA VARCHAR2(20),
-            STATUS VARCHAR2(10)
-        ) ON COMMIT PRESERVE ROWS';
-        
-        DBMS_OUTPUT.PUT_LINE('Tabela TMP_CLIENTES_SINACOR criada.');
-    ELSE
-        DBMS_OUTPUT.PUT_LINE('Tabela TMP_CLIENTES_SINACOR já existe.');
-    END IF;
-END;
-/
+public class InputParameters
+{
+    [Required]
+    public DateTime BusinessDate { get; set; } = DateTime.Today;
+
+    [Range(1, int.MaxValue, ErrorMessage = "Versão deve ser maior que 0")]
+    public int Version { get; set; } = 1;
+
+    [Required]
+    public string AdHoc { get; set; } = "N";
+
+    [Required(ErrorMessage = "Selecione um Feed")]
+    public string Feed { get; set; } = string.Empty;
+
+    [Range(1, int.MaxValue, ErrorMessage = "ID deve ser maior que 0")]
+    public int ArchiveID { get; set; } = 1;
+
+    public DateTime InitialDate { get; set; } = DateTime.Today.AddDays(-7);
+    public DateTime EndDate { get; set; } = DateTime.Today;
+}
+
+
+
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+
+public class GeraServices
+{
+    private readonly ILogger<GeraServices> _logger;
+
+    public GeraServices(ILogger<GeraServices> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task InitGenerateFiles(InputParameters parameters, Action<LogEntry> logCallback)
+    {
+        try
+        {
+            logCallback?.Invoke(new LogEntry("🟢 Iniciando geração dos feeds...", LogLevel.Information));
+
+            await Task.Delay(1000);
+            logCallback?.Invoke(new LogEntry($"📅 Business Date: {parameters.BusinessDate:yyyy-MM-dd}", LogLevel.Information));
+
+            await Task.Delay(1000);
+            logCallback?.Invoke(new LogEntry($"🔢 Version: {parameters.Version}", LogLevel.Information));
+
+            await Task.Delay(1000);
+            logCallback?.Invoke(new LogEntry($"⚡ AdHoc: {parameters.AdHoc}", LogLevel.Information));
+
+            await Task.Delay(1000);
+            logCallback?.Invoke(new LogEntry($"📦 Feed: {parameters.Feed}", LogLevel.Information));
+
+            await Task.Delay(1000);
+            logCallback?.Invoke(new LogEntry($"🆔 ArchiveID: {parameters.ArchiveID}", LogLevel.Information));
+
+            await Task.Delay(1000);
+            logCallback?.Invoke(new LogEntry($"⏳ Período: {parameters.InitialDate:yyyy-MM-dd} até {parameters.EndDate:yyyy-MM-dd}", LogLevel.Information));
+
+            if (parameters.Version < 1)
+            {
+                logCallback?.Invoke(new LogEntry("⚠️ Versão inválida, processo abortado.", LogLevel.Warning));
+                return;
+            }
+
+            await Task.Delay(2000);
+            logCallback?.Invoke(new LogEntry("✅ Processo finalizado com sucesso!", LogLevel.Information));
+
+        }
+        catch (Exception ex)
+        {
+            logCallback?.Invoke(new LogEntry($"❌ Erro na geração: {ex.Message}", LogLevel.Error));
+            _logger.LogError(ex, "Erro ao gerar feed.");
+        }
+    }
+}
+
+public class LogEntry
+{
+    public string Message { get; }
+    public LogLevel Level { get; }
+
+    public LogEntry(string message, LogLevel level)
+    {
+        Message = message;
+        Level = level;
+    }
+}
+
+@page "/feed-generation"
+@inject IConfiguration Configuration
+@inject GeraServices GeraServices
+
+<div class="container">
+    <div class="row">
+        <!-- Formulário -->
+        <div class="col-lg-8 col-md-12">
+            <h3 class="mb-3">🔹 Geração de Feeds</h3>
+
+            <EditForm Model="@inputParameters" OnValidSubmit="@GenerateFeed">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>📅 Business Date:</label>
+                    <InputDate @bind-Value="inputParameters.BusinessDate" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>🔢 Version:</label>
+                    <InputNumber @bind-Value="inputParameters.Version" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>⚡ AdHoc:</label>
+                    <InputSelect @bind-Value="inputParameters.AdHoc" class="form-control">
+                        <option value="S">Sim</option>
+                        <option value="N">Não</option>
+                    </InputSelect>
+                </div>
+
+                <div class="form-group">
+                    <label>📦 Feed:</label>
+                    <InputSelect @bind-Value="inputParameters.Feed" class="form-control">
+                        <option value="">Selecione um Feed</option>
+                        @foreach (var feed in FeedList)
+                        {
+                            <option value="@feed">@feed</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-group">
+                    <label>🆔 Archive ID:</label>
+                    <InputNumber @bind-Value="inputParameters.ArchiveID" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>⏳ Initial Date:</label>
+                    <InputDate @bind-Value="inputParameters.InitialDate" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>⏳ End Date:</label>
+                    <InputDate @bind-Value="inputParameters.EndDate" class="form-control" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mt-3" disabled="@isGenerating">
+                    @(isGenerating ? "Gerando..." : "🚀 Gerar Feed")
+                </button>
+            </EditForm>
+        </div>
+
+        <!-- Logs -->
+        <div class="col-lg-4 col-md-12 logs-panel">
+            <h4>📜 Logs</h4>
+            <div class="logs-container">
+                @foreach (var log in Logs)
+                {
+                    <div class="log-entry @GetLogClass(log.Level)">
+                        <strong>@log.Level:</strong> @log.Message
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private InputParameters inputParameters = new();
+    private List<string> FeedList = new();
+    private List<LogEntry> Logs = new();
+    private bool isGenerating = false;
+
+    protected override void OnInitialized()
+    {
+        FeedList = Configuration.GetSection("Feeds").Get<List<string>>() ?? new List<string>();
+    }
+
+    private async Task GenerateFeed()
+    {
+        isGenerating = true;
+        Logs.Clear();
+        Logs.Add(new LogEntry("🔄 Iniciando geração...", LogLevel.Information));
+
+        await Task.Run(async () =>
+        {
+            await GeraServices.InitGenerateFiles(inputParameters, async log =>
+            {
+                Logs.Add(log);
+                await InvokeAsync(StateHasChanged);
+            });
+        });
+
+        isGenerating = false;
+    }
+
+    private string GetLogClass(LogLevel level) =>
+        level switch
+        {
+            LogLevel.Information => "log-info",
+            LogLevel.Warning => "log-warning",
+            LogLevel.Error => "log-error",
+            _ => ""
+        };
+}
