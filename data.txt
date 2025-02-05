@@ -1,170 +1,62 @@
-using System;
-using System.ComponentModel.DataAnnotations;
-
-public class InputParameters
-{
-    [Required]
-    public DateTime BusinessDate { get; set; } = DateTime.Today;
-
-    [Range(1, int.MaxValue, ErrorMessage = "Versão deve ser maior que 0")]
-    public int Version { get; set; } = 1;
-
-    [Required]
-    public string AdHoc { get; set; } = "N";
-
-    [Required(ErrorMessage = "Selecione um Feed")]
-    public string Feed { get; set; } = string.Empty;
-
-    [Range(1, int.MaxValue, ErrorMessage = "ID deve ser maior que 0")]
-    public int ArchiveID { get; set; } = 1;
-
-    public DateTime InitialDate { get; set; } = DateTime.Today.AddDays(-7);
-    public DateTime EndDate { get; set; } = DateTime.Today;
-}
-
-
-
-using System;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
-
-public class GeraServices
-{
-    private readonly ILogger<GeraServices> _logger;
-
-    public GeraServices(ILogger<GeraServices> logger)
-    {
-        _logger = logger;
-    }
-
-    public async Task InitGenerateFiles(InputParameters parameters, Action<LogEntry> logCallback)
-    {
-        try
-        {
-            logCallback?.Invoke(new LogEntry("🟢 Iniciando geração dos feeds...", LogLevel.Information));
-
-            await Task.Delay(1000);
-            logCallback?.Invoke(new LogEntry($"📅 Business Date: {parameters.BusinessDate:yyyy-MM-dd}", LogLevel.Information));
-
-            await Task.Delay(1000);
-            logCallback?.Invoke(new LogEntry($"🔢 Version: {parameters.Version}", LogLevel.Information));
-
-            await Task.Delay(1000);
-            logCallback?.Invoke(new LogEntry($"⚡ AdHoc: {parameters.AdHoc}", LogLevel.Information));
-
-            await Task.Delay(1000);
-            logCallback?.Invoke(new LogEntry($"📦 Feed: {parameters.Feed}", LogLevel.Information));
-
-            await Task.Delay(1000);
-            logCallback?.Invoke(new LogEntry($"🆔 ArchiveID: {parameters.ArchiveID}", LogLevel.Information));
-
-            await Task.Delay(1000);
-            logCallback?.Invoke(new LogEntry($"⏳ Período: {parameters.InitialDate:yyyy-MM-dd} até {parameters.EndDate:yyyy-MM-dd}", LogLevel.Information));
-
-            if (parameters.Version < 1)
-            {
-                logCallback?.Invoke(new LogEntry("⚠️ Versão inválida, processo abortado.", LogLevel.Warning));
-                return;
-            }
-
-            await Task.Delay(2000);
-            logCallback?.Invoke(new LogEntry("✅ Processo finalizado com sucesso!", LogLevel.Information));
-
-        }
-        catch (Exception ex)
-        {
-            logCallback?.Invoke(new LogEntry($"❌ Erro na geração: {ex.Message}", LogLevel.Error));
-            _logger.LogError(ex, "Erro ao gerar feed.");
-        }
-    }
-}
-
-public class LogEntry
-{
-    public string Message { get; }
-    public LogLevel Level { get; }
-
-    public LogEntry(string message, LogLevel level)
-    {
-        Message = message;
-        Level = level;
-    }
-}
-
 @page "/feed-generation"
-@inject IConfiguration Configuration
-@inject GeraServices GeraServices
+@inject IGeraService GeraService
 
-<div class="container">
-    <div class="row">
-        <!-- Formulário -->
-        <div class="col-lg-8 col-md-12">
-            <h3 class="mb-3">🔹 Geração de Feeds</h3>
+<h3>📜 Geração de Feeds</h3>
 
-            <EditForm Model="@inputParameters" OnValidSubmit="@GenerateFeed">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-
-                <div class="form-group">
-                    <label>📅 Business Date:</label>
-                    <InputDate @bind-Value="inputParameters.BusinessDate" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <label>🔢 Version:</label>
-                    <InputNumber @bind-Value="inputParameters.Version" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <label>⚡ AdHoc:</label>
-                    <InputSelect @bind-Value="inputParameters.AdHoc" class="form-control">
-                        <option value="S">Sim</option>
-                        <option value="N">Não</option>
-                    </InputSelect>
-                </div>
-
-                <div class="form-group">
-                    <label>📦 Feed:</label>
-                    <InputSelect @bind-Value="inputParameters.Feed" class="form-control">
-                        <option value="">Selecione um Feed</option>
-                        @foreach (var feed in FeedList)
-                        {
-                            <option value="@feed">@feed</option>
-                        }
-                    </InputSelect>
-                </div>
-
-                <div class="form-group">
-                    <label>🆔 Archive ID:</label>
-                    <InputNumber @bind-Value="inputParameters.ArchiveID" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <label>⏳ Initial Date:</label>
-                    <InputDate @bind-Value="inputParameters.InitialDate" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <label>⏳ End Date:</label>
-                    <InputDate @bind-Value="inputParameters.EndDate" class="form-control" />
-                </div>
-
-                <button type="submit" class="btn btn-primary w-100 mt-3" disabled="@isGenerating">
-                    @(isGenerating ? "Gerando..." : "🚀 Gerar Feed")
-                </button>
-            </EditForm>
+<div class="card">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <label>📅 Business Date:</label>
+                <InputDate @bind-Value="inputParameters.BusinessDate" class="form-control" />
+            </div>
+            <div class="col-md-2">
+                <label>🔢 Version:</label>
+                <InputNumber @bind-Value="inputParameters.Version" class="form-control" />
+            </div>
+            <div class="col-md-2">
+                <label>⚡ AdHoc:</label>
+                <InputSelect @bind-Value="inputParameters.AdHoc" class="form-control">
+                    <option value="S">Sim</option>
+                    <option value="N">Não</option>
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label>📦 Feed:</label>
+                <InputSelect @bind-Value="inputParameters.Feed" class="form-control">
+                    @foreach (var feed in availableFeeds)
+                    {
+                        <option value="@feed">@feed</option>
+                    }
+                </InputSelect>
+            </div>
         </div>
 
-        <!-- Logs -->
-        <div class="col-lg-4 col-md-12 logs-panel">
-            <h4>📜 Logs</h4>
-            <div class="logs-container">
-                @foreach (var log in Logs)
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <label>🆔 Archive ID:</label>
+                <InputText @bind-Value="inputParameters.ArchiveID" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label>⏳ Initial Date:</label>
+                <InputDate @bind-Value="inputParameters.InitialDate" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label>⏳ End Date:</label>
+                <InputDate @bind-Value="inputParameters.EndDate" class="form-control" />
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-primary" @onclick="GenerateFeed">🚀 Generate Feeds</button>
+        </div>
+
+        <h5 class="mt-4">📜 Log do Processo</h5>
+        <div class="log-container">
+            <div class="log-box" id="logBox">
+                @foreach (var log in logs)
                 {
-                    <div class="log-entry @GetLogClass(log.Level)">
-                        <strong>@log.Level:</strong> @log.Message
-                    </div>
+                    <div class="@GetLogClass(log.Level)">@log.Message</div>
                 }
             </div>
         </div>
@@ -173,39 +65,84 @@ public class LogEntry
 
 @code {
     private InputParameters inputParameters = new();
-    private List<string> FeedList = new();
-    private List<LogEntry> Logs = new();
-    private bool isGenerating = false;
-
-    protected override void OnInitialized()
-    {
-        FeedList = Configuration.GetSection("Feeds").Get<List<string>>() ?? new List<string>();
-    }
+    private List<string> availableFeeds = new() { "Feed A", "Feed B", "Feed C" };
+    private List<LogEntry> logs = new();
 
     private async Task GenerateFeed()
     {
-        isGenerating = true;
-        Logs.Clear();
-        Logs.Add(new LogEntry("🔄 Iniciando geração...", LogLevel.Information));
-
-        await Task.Run(async () =>
-        {
-            await GeraServices.InitGenerateFiles(inputParameters, async log =>
-            {
-                Logs.Add(log);
-                await InvokeAsync(StateHasChanged);
-            });
-        });
-
-        isGenerating = false;
+        logs.Clear();
+        await GeraService.InitGenerateFiles(inputParameters, AddLog);
     }
 
-    private string GetLogClass(LogLevel level) =>
-        level switch
-        {
-            LogLevel.Information => "log-info",
-            LogLevel.Warning => "log-warning",
-            LogLevel.Error => "log-error",
-            _ => ""
-        };
+    private void AddLog(LogEntry logEntry)
+    {
+        logs.Add(logEntry);
+        StateHasChanged();
+        ScrollToBottom();
+    }
+
+    private string GetLogClass(LogLevel level) => level switch
+    {
+        LogLevel.Information => "log-info",
+        LogLevel.Warning => "log-warning",
+        LogLevel.Error => "log-error",
+        _ => "log-info"
+    };
+
+    private async Task ScrollToBottom()
+    {
+        await JS.InvokeVoidAsync("scrollToBottom", "logBox");
+    }
 }
+
+
+.log-container {
+    height: 300px;
+    overflow-y: auto;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    margin-top: 10px;
+}
+
+.log-box {
+    height: 100%;
+    overflow-y: auto;
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+
+.log-info {
+    color: #17a2b8;
+}
+
+.log-warning {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+.log-error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+
+wwwroot/js/site.js
+
+js
+Copiar
+Editar
+window.scrollToBottom = (elementId) => {
+    var element = document.getElementById(elementId);
+    if (element) {
+        element.scrollTop = element.scrollHeight;
+    }
+};
+
+E no arquivo _Host.cshtml, adicione a referência ao script:
+
+html
+Copiar
+Editar
+<script src="js/site.js"></script>
