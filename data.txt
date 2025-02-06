@@ -1,11 +1,60 @@
-private string GetLogClass(LogLevel level) => level switch
-{
-    LogLevel.Trace => "log-trace",          // 🔍 Logs detalhados para debugging
-    LogLevel.Debug => "log-debug",          // 🐞 Logs para depuração
-    LogLevel.Information => "log-info",     // ℹ️ Informações gerais
-    LogLevel.Warning => "log-warning",      // ⚠️ Avisos e possíveis problemas
-    LogLevel.Error => "log-error",          // ❌ Erros que impactam a funcionalidade
-    LogLevel.Critical => "log-critical",    // 🚨 Falhas graves no sistema
-    LogLevel.None => "log-none",            // 🚫 Nenhuma categoria específica
-    _ => "log-default"                      // 🔄 Caso algum novo nível seja adicionado futuramente
-};
+/* Estilos base para os logs */
+.log-container {
+    max-height: 400px; /* Define uma altura máxima */
+    overflow-y: auto; /* Adiciona rolagem quando necessário */
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #1e1e1e; /* Fundo escuro para melhor legibilidade */
+    color: #ddd;
+    font-family: Consolas, monospace;
+    font-size: 14px;
+    white-space: pre-wrap; /* Mantém a formatação */
+}
+
+/* Estilos para cada nível de log */
+.log-trace {
+    color: #cccccc; /* Cinza claro */
+}
+
+.log-debug {
+    color: #00bcd4; /* Azul-ciano */
+}
+
+.log-info {
+    color: #4caf50; /* Verde */
+}
+
+.log-warning {
+    color: #ff9800; /* Laranja */
+    font-weight: bold;
+}
+
+.log-error {
+    color: #f44336; /* Vermelho */
+    font-weight: bold;
+}
+
+.log-critical {
+    color: #e91e63; /* Rosa forte */
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.log-none {
+    color: #bdbdbd; /* Cinza neutro */
+}
+
+.log-default {
+    color: #ffffff; /* Branco */
+}
+
+/* Adiciona animação de fade-in nos logs */
+.log-entry {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
