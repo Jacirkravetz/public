@@ -2,6 +2,18 @@ dotnet add package Microsoft.Identity.Web
 dotnet add package Microsoft.Identity.Web.UI
 dotnet add package Microsoft.AspNetCore.Authentication.OpenIdConnect
 
+
+ItemGroup>
+    <!-- Dependências para Autenticação com Microsoft Identity -->
+    <PackageReference Include="Microsoft.Identity.Web" Version="1.25.11" />
+    <PackageReference Include="Microsoft.Identity.Web.UI" Version="1.25.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.0" />
+    
+    <!-- Outras dependências opcionais -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.31.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
+  </ItemGroup>
+
 3️⃣ Configurar appsettings.json
 
 {
