@@ -1,3 +1,215 @@
-https://graph.microsoft.com/v1.0/me?access_token=SEU_ACCESS_TOKEN_AQUI
+dotnet add package Microsoft.Identity.Web
+dotnet add package Microsoft.Identity.Web.UI
+dotnet add package Microsoft.AspNetCore.Authentication.OpenIdConnect
 
-https://developer.microsoft.com/en-us/graph/graph-explorer
+3️⃣ Configurar appsettings.json
+
+{
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "SEU_TENANT_ID",
+    "ClientId": "SEU_CLIENT_ID",
+    "ClientSecret": "SEU_CLIENT_SECRET",
+    "RedirectUri": "https://localhost:5001/signin-oidc",
+    "Scope": "api://SEU_CLIENT_ID/.default"
+  },
+  "API": {
+    "BaseUrl": "https://api.exemplo.com/endpoint",
+    "VersionHeader": "1.0"
+  }
+}
+
+
+4️⃣ Configurar a Autenticação OAuth2 com PKCE
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
+using System.Net.Http.Headers;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Adiciona autenticação Azure AD
+builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
+    .EnableTokenAcquisitionToCallDownstreamApi()
+    .AddInMemoryTokenCaches();
+
+// Adiciona autorização
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy;
+});
+
+// Adiciona Blazor Pages e Controladores
+builder.Services.AddRazorPages()
+    .AddMvcOptions(options =>
+    {
+        var policy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+        options.Filters.Add(new AuthorizeFilter(policy));
+    })
+    .AddMicrosoftIdentityUI();
+
+builder.Services.AddServerSideBlazor();
+builder.Services.AddHttpContextAccessor();
+
+// Adiciona serviço HTTP para chamadas autenticadas
+builder.Services.AddHttpClient("ApiClient", client =>
+{
+    client.DefaultRequestHeaders.Add("version", builder.Configuration["API:VersionHeader"]);
+}).AddHttpMessageHandler<AuthorizationHandler>();
+
+builder.Services.AddScoped<AuthorizationHandler>();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+app.Run();
+
+5️⃣ Criar Middleware para Adicionar Token nas Requisições
+Crie AuthorizationHandler.cs na pasta Services/:
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class AuthorizationHandler : DelegatingHandler
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public AuthorizationHandler(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var accessToken = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token");
+
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        }
+
+        return await base.SendAsync(request, cancellationToken);
+    }
+}
+
+6️⃣ Criar Página Blazor para Fazer a Chamada na API
+Crie Pages/ApiData.razor:
+@page "/apidata"
+@inject IHttpClientFactory HttpClientFactory
+
+<h3>Dados da API</h3>
+
+@if (string.IsNullOrEmpty(ApiResponse))
+{
+    <button class="btn btn-primary" @onclick="CallApi">Chamar API</button>
+}
+else
+{
+    <pre>@ApiResponse</pre>
+}
+
+@code {
+    private string ApiResponse;
+
+    private async Task CallApi()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync("https://api.exemplo.com/endpoint");
+
+            if (response.IsSuccessStatusCode)
+            {
+                ApiResponse = await response.Content.ReadAsStringAsync();
+            }
+            else
+            {
+                ApiResponse = $"Erro: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            ApiResponse = $"Erro: {ex.Message}";
+        }
+    }
+}
+
+7️⃣ Criar Interface de Login
+Agora, edite Pages/_Host.cshtml para incluir o login/logout:
+@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Bem-vindo ao Blazor Server!</h3>
+
+<AuthorizeView>
+    <Authorized>
+        <p>Bem-vindo, @context.User.Identity.Name!</p>
+        <a class="btn btn-danger" href="MicrosoftIdentity/Account/SignOut">Logout</a>
+    </Authorized>
+    <NotAuthorized>
+        <a class="btn btn-success" href="MicrosoftIdentity/Account/SignIn">Login</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+8️⃣ Criar Endpoint no Backend
+Crie Controllers/AuthController.cs para expor a API:
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+
+[Authorize]
+[ApiController]
+[Route("api/auth")]
+public class AuthController : ControllerBase
+{
+    private readonly HttpClient _httpClient;
+
+    public AuthController(IHttpClientFactory httpClientFactory)
+    {
+        _httpClient = httpClientFactory.CreateClient("ApiClient");
+    }
+
+    [HttpGet("data")]
+    public async Task<IActionResult> GetData()
+    {
+        var response = await _httpClient.GetAsync("https://api.exemplo.com/endpoint");
+
+        if (!response.IsSuccessStatusCode)
+            return StatusCode((int)response.StatusCode, "Erro ao acessar API");
+
+        return Ok(await response.Content.ReadAsStringAsync());
+    }
+}
