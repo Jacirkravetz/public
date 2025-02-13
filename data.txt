@@ -1,86 +1,109 @@
+📌 Estrutura do Projeto
+pgsql
+Copiar
+Editar
+📂 BlazorAuthPKCE
+│── 📂 Pages
+│   ├── Index.razor
+│   ├── Login.razor
+│   ├── Logout.razor
+│── 📂 Services
+│   ├── AuthService.cs
+│   ├── ApiService.cs
+│── 📂 Components
+│   ├── LoadingSpinner.razor
+│── 📂 Shared
+│   ├── MainLayout.razor
+│── 📂 wwwroot
+│── App.razor
+│── Program.cs
+│── BlazorAuthPKCE.csproj
+│── appsettings.json
+📌 1. Criando o Projeto
+Execute o seguinte comando para criar um Blazor Web App (.NET 8):
+
+sh
+Copiar
+Editar
+dotnet new blazorserver -o BlazorAuthPKCE
+cd BlazorAuthPKCE
+Em seguida, adicione as dependências necessárias:
+
+sh
+Copiar
+Editar
 dotnet add package Microsoft.Identity.Web
 dotnet add package Microsoft.Identity.Web.UI
 dotnet add package Microsoft.AspNetCore.Authentication.OpenIdConnect
+dotnet add package Microsoft.AspNetCore.Authorization
+dotnet add package System.IdentityModel.Tokens.Jwt
+dotnet restore
+📌 2. Configuração do appsettings.json
+Configure os detalhes da sua Azure AD App Registration:
 
-
-ItemGroup>
-    <!-- Dependências para Autenticação com Microsoft Identity -->
-    <PackageReference Include="Microsoft.Identity.Web" Version="1.25.11" />
-    <PackageReference Include="Microsoft.Identity.Web.UI" Version="1.25.11" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.0" />
-    
-    <!-- Outras dependências opcionais -->
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.31.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
-  </ItemGroup>
-
-3️⃣ Configurar appsettings.json
-
+json
+Copiar
+Editar
 {
   "AzureAd": {
     "Instance": "https://login.microsoftonline.com/",
-    "TenantId": "SEU_TENANT_ID",
-    "ClientId": "SEU_CLIENT_ID",
-    "ClientSecret": "SEU_CLIENT_SECRET",
-    "RedirectUri": "https://localhost:5001/signin-oidc",
-    "Scope": "api://SEU_CLIENT_ID/.default"
+    "Domain": "seu-dominio.onmicrosoft.com",
+    "TenantId": "seu-tenant-id",
+    "ClientId": "seu-cliente-id",
+    "ClientSecret": "seu-cliente-secret",
+    "CallbackPath": "/signin-oidc",
+    "Scopes": [ "https://graph.microsoft.com/.default" ]
   },
-  "API": {
-    "BaseUrl": "https://api.exemplo.com/endpoint",
-    "VersionHeader": "1.0"
+  "ApiSettings": {
+    "BaseUrl": "https://api.exemplo.com/",
+    "Endpoint": "endpoint",
+    "Version": "1.0"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
   }
 }
+📌 3. Configuração de Autenticação no Program.cs
+Aqui adicionamos OAuth2 com PKCE, autorização e serviços:
 
-
-4️⃣ Configurar a Autenticação OAuth2 com PKCE
+csharp
+Copiar
+Editar
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Authorization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
-using System.Net.Http.Headers;
+using BlazorAuthPKCE.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Adiciona autenticação Azure AD
+// Configura autenticação Azure AD PKCE
 builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
-    .EnableTokenAcquisitionToCallDownstreamApi()
+    .EnableTokenAcquisitionToCallDownstreamApi(builder.Configuration["AzureAd:Scopes"])
     .AddInMemoryTokenCaches();
 
-// Adiciona autorização
+// Configura autorização global
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = options.DefaultPolicy;
 });
 
-// Adiciona Blazor Pages e Controladores
+// Adiciona Blazor e suporte a Identity UI
 builder.Services.AddRazorPages()
-    .AddMvcOptions(options =>
-    {
-        var policy = new AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .Build();
-        options.Filters.Add(new AuthorizeFilter(policy));
-    })
     .AddMicrosoftIdentityUI();
+builder.Services.AddServerSideBlazor()
+    .AddMicrosoftIdentityConsentHandler();
 
-builder.Services.AddServerSideBlazor();
+// Injeção de serviços
 builder.Services.AddHttpContextAccessor();
-
-// Adiciona serviço HTTP para chamadas autenticadas
-builder.Services.AddHttpClient("ApiClient", client =>
-{
-    client.DefaultRequestHeaders.Add("version", builder.Configuration["API:VersionHeader"]);
-}).AddHttpMessageHandler<AuthorizationHandler>();
-
-builder.Services.AddScoped<AuthorizationHandler>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<ApiService>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
@@ -93,135 +116,156 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+app.MapControllers();
 
 app.Run();
+📌 4. Criando o Serviço de Autenticação (AuthService.cs)
+Este serviço gerencia tokens OAuth2 de forma eficiente:
 
-5️⃣ Criar Middleware para Adicionar Token nas Requisições
-Crie AuthorizationHandler.cs na pasta Services/:
+csharp
+Copiar
+Editar
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
-using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Security.Claims;
 
-public class AuthorizationHandler : DelegatingHandler
+namespace BlazorAuthPKCE.Services
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public AuthorizationHandler(IHttpContextAccessor httpContextAccessor)
+    public class AuthService
     {
-        _httpContextAccessor = httpContextAccessor;
-    }
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        var accessToken = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token");
-
-        if (!string.IsNullOrEmpty(accessToken))
+        public AuthService(IHttpContextAccessor httpContextAccessor)
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            _httpContextAccessor = httpContextAccessor;
         }
 
-        return await base.SendAsync(request, cancellationToken);
+        public async Task<string?> GetAccessTokenAsync()
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext == null)
+                return null;
+
+            return await httpContext.GetTokenAsync("access_token");
+        }
+
+        public string? GetUserName()
+        {
+            return _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Name)?.Value;
+        }
+
+        public bool IsAuthenticated()
+        {
+            return _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+        }
     }
 }
+📌 5. Criando o Serviço de Chamada da API (ApiService.cs)
+Esse serviço faz chamadas seguras à API protegida:
 
-6️⃣ Criar Página Blazor para Fazer a Chamada na API
-Crie Pages/ApiData.razor:
-@page "/apidata"
-@inject IHttpClientFactory HttpClientFactory
+csharp
+Copiar
+Editar
+using System.Net.Http.Headers;
+using Microsoft.Extensions.Configuration;
 
-<h3>Dados da API</h3>
-
-@if (string.IsNullOrEmpty(ApiResponse))
+namespace BlazorAuthPKCE.Services
 {
-    <button class="btn btn-primary" @onclick="CallApi">Chamar API</button>
+    public class ApiService
+    {
+        private readonly HttpClient _httpClient;
+        private readonly AuthService _authService;
+        private readonly IConfiguration _configuration;
+
+        public ApiService(HttpClient httpClient, AuthService authService, IConfiguration configuration)
+        {
+            _httpClient = httpClient;
+            _authService = authService;
+            _configuration = configuration;
+        }
+
+        public async Task<string> GetDataFromApiAsync()
+        {
+            string? token = await _authService.GetAccessTokenAsync();
+            if (string.IsNullOrEmpty(token))
+                return "Token inválido.";
+
+            string baseUrl = _configuration["ApiSettings:BaseUrl"];
+            string endpoint = _configuration["ApiSettings:Endpoint"];
+
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            HttpResponseMessage response = await _httpClient.GetAsync($"{baseUrl}{endpoint}");
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadAsStringAsync()
+                : $"Erro: {response.StatusCode}";
+        }
+    }
+}
+📌 6. Criando a Página de Login (Login.razor)
+razor
+Copiar
+Editar
+@page "/login"
+@inject NavigationManager Navigation
+
+<h3>Login</h3>
+<button class="btn btn-primary" @onclick="Login">Entrar com Microsoft</button>
+
+@code {
+    private void Login() => Navigation.NavigateTo("MicrosoftIdentity/Account/SignIn", true);
+}
+📌 7. Criando a Página Principal (Index.razor)
+razor
+Copiar
+Editar
+@page "/"
+@inject ApiService ApiService
+@inject AuthService AuthService
+
+<h3>Bem-vindo, @AuthService.GetUserName()!</h3>
+
+@if (AuthService.IsAuthenticated())
+{
+    <button class="btn btn-primary" @onclick="ChamarApi">Chamar API</button>
+    <p>@resultado</p>
 }
 else
 {
-    <pre>@ApiResponse</pre>
+    <p>Você precisa estar autenticado para acessar esta página.</p>
 }
 
 @code {
-    private string ApiResponse;
+    private string resultado = "Clique para buscar dados da API.";
 
-    private async Task CallApi()
+    private async Task ChamarApi()
     {
-        try
-        {
-            var client = HttpClientFactory.CreateClient("ApiClient");
-            var response = await client.GetAsync("https://api.exemplo.com/endpoint");
-
-            if (response.IsSuccessStatusCode)
-            {
-                ApiResponse = await response.Content.ReadAsStringAsync();
-            }
-            else
-            {
-                ApiResponse = $"Erro: {response.StatusCode}";
-            }
-        }
-        catch (Exception ex)
-        {
-            ApiResponse = $"Erro: {ex.Message}";
-        }
+        resultado = await ApiService.GetDataFromApiAsync();
     }
 }
-
-7️⃣ Criar Interface de Login
-Agora, edite Pages/_Host.cshtml para incluir o login/logout:
-@page "/"
-@using Microsoft.AspNetCore.Components.Authorization
+📌 8. Criando a Página de Logout (Logout.razor)
+razor
+Copiar
+Editar
+@page "/logout"
 @inject NavigationManager Navigation
-@inject AuthenticationStateProvider AuthStateProvider
 
-<h3>Bem-vindo ao Blazor Server!</h3>
+<h3>Sair</h3>
+<button class="btn btn-danger" @onclick="Logout">Sair</button>
 
-<AuthorizeView>
-    <Authorized>
-        <p>Bem-vindo, @context.User.Identity.Name!</p>
-        <a class="btn btn-danger" href="MicrosoftIdentity/Account/SignOut">Logout</a>
-    </Authorized>
-    <NotAuthorized>
-        <a class="btn btn-success" href="MicrosoftIdentity/Account/SignIn">Login</a>
-    </NotAuthorized>
-</AuthorizeView>
-
-8️⃣ Criar Endpoint no Backend
-Crie Controllers/AuthController.cs para expor a API:
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
-
-[Authorize]
-[ApiController]
-[Route("api/auth")]
-public class AuthController : ControllerBase
-{
-    private readonly HttpClient _httpClient;
-
-    public AuthController(IHttpClientFactory httpClientFactory)
-    {
-        _httpClient = httpClientFactory.CreateClient("ApiClient");
-    }
-
-    [HttpGet("data")]
-    public async Task<IActionResult> GetData()
-    {
-        var response = await _httpClient.GetAsync("https://api.exemplo.com/endpoint");
-
-        if (!response.IsSuccessStatusCode)
-            return StatusCode((int)response.StatusCode, "Erro ao acessar API");
-
-        return Ok(await response.Content.ReadAsStringAsync());
-    }
+@code {
+    private void Logout() => Navigation.NavigateTo("MicrosoftIdentity/Account/SignOut", true);
 }
+📌 9. Rodando o Projeto
+Execute o seguinte comando:
+
+sh
+Copiar
+Editar
+dotnet run
+🚀 Acesse https://localhost:5001/ e teste a autenticação!
