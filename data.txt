@@ -1,14 +1,85 @@
-public async Task<string?> GetAccessTokenAsync()
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
+    .EnableTokenAcquisitionToCallDownstreamApi()
+    .AddInMemoryTokenCaches();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddAuthorization();
+builder.Services.AddScoped<TokenService>(); // ✅ Registra o TokenService
+builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
+
+builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor()
+    .AddMicrosoftIdentityConsentHandler();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+app.Run();
+
+
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.IdentityModel.JsonWebTokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+
+namespace BlazorAuthPKCE.Services
+{
+    public class TokenService
+    {
+        private readonly AuthenticationStateProvider _authenticationStateProvider;
+
+        public TokenService(AuthenticationStateProvider authenticationStateProvider)
         {
-            try
+            _authenticationStateProvider = authenticationStateProvider;
+        }
+
+        public async Task<string?> GetAccessTokenAsync()
+        {
+            var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity == null || !user.Identity.IsAuthenticated)
             {
-                var scopes = new[] { "https://graph.microsoft.com/.default" }; // Defina os escopos da API
-                string token = await _tokenAcquisition.GetAccessTokenForUserAsync(scopes);
-                return token;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erro ao obter o token: {ex.Message}");
+                Console.WriteLine("⚠️ Usuário não autenticado.");
                 return null;
             }
+
+            // 📌 Recupera o token diretamente dos claims do usuário
+            var accessToken = user.Claims.FirstOrDefault(c => c.Type == "access_token")?.Value;
+
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                Console.WriteLine("⚠️ Token de acesso não encontrado.");
+                return null;
+            }
+
+            return accessToken;
         }
+
+        public string? GetUserName()
+        {
+            var authState = _authenticationStateProvider.GetAuthenticationStateAsync().Result;
+            return authState.User.Identity?.Name;
+        }
+
+        public bool IsAuthenticated()
+        {
+            var authState = _authenticationStateProvider.GetAuthenticationStateAsync().Result;
+            return authState.User.Identity?.IsAuthenticated ?? false;
+        }
+    }
+}
