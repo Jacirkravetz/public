@@ -1,45 +1,10 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Identity.Web;
-using System.Threading.Tasks;
+ using var reader = await connection.ExecuteReaderAsync("SELECT Id, Nome FROM Usuarios", commandTimeout: 0); 
 
-namespace BlazorAuthPKCE.Services
-{
-    public class TokenService
+    while (await reader.ReadAsync())
     {
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ITokenAcquisition _tokenAcquisition;
-
-        public TokenService(IHttpContextAccessor httpContextAccessor, ITokenAcquisition tokenAcquisition)
+        yield return new Usuario
         {
-            _httpContextAccessor = httpContextAccessor;
-            _tokenAcquisition = tokenAcquisition;
-        }
-
-        public async Task<string?> GetAccessTokenAsync()
-        {
-            var httpContext = _httpContextAccessor.HttpContext;
-
-            if (httpContext == null)
-                return null;
-
-            // 📌 Primeiro tenta obter o token direto do contexto do usuário autenticado
-            string? token = await httpContext.GetTokenAsync("access_token");
-
-            if (!string.IsNullOrEmpty(token))
-                return token;
-
-            try
-            {
-                // 📌 Se não conseguir, tenta obter diretamente do Microsoft Identity
-                var scopes = new[] { "https://graph.microsoft.com/.default" };
-                token = await _tokenAcquisition.GetAccessTokenForUserAsync(scopes);
-                return token;
-            }
-            catch
-            {
-                return null;
-            }
-        }
+            Id = reader.GetInt32(0),
+            Nome = reader.GetString(1)
+        };
     }
-}
