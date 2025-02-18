@@ -1,4 +1,10 @@
- using var reader = await connection.ExecuteReaderAsync("SELECT Id, Nome FROM Usuarios", commandTimeout: 0); 
+var parameters = new { InitialDate = initialDate, EndDate = endDate };
+    
+    using var reader = await connection.ExecuteReaderAsync(
+        "SELECT Id, Nome FROM Usuarios WHERE DataCriacao BETWEEN @InitialDate AND @EndDate", 
+        parameters, 
+        commandTimeout: 0
+    );
 
     while (await reader.ReadAsync())
     {
