@@ -1,16 +1,45 @@
-var parameters = new { InitialDate = initialDate, EndDate = endDate };
-    
-    using var reader = await connection.ExecuteReaderAsync(
-        "SELECT Id, Nome FROM Usuarios WHERE DataCriacao BETWEEN @InitialDate AND @EndDate", 
-        parameters, 
-        commandTimeout: 0
-    );
+using System;
+using System.Net;
+using System.Net.Mail;
+using System.Threading.Tasks;
 
-    while (await reader.ReadAsync())
+dotnet new console -n EmailSender
+cd EmailSender
+
+
+class Program
+{
+    static async Task Main(string[] args)
     {
-        yield return new Usuario
-        {
-            Id = reader.GetInt32(0),
-            Nome = reader.GetString(1)
-        };
+        string smtpServer = "smtp.gmail.com"; // Altere conforme o provedor
+        int smtpPort = 465; // SSL geralmente usa a porta 465
+        string senderEmail = "seuemail@gmail.com"; // Insira seu e-mail
+        string senderPassword = "suasenha"; // Insira sua senha ou App Password
+        string recipientEmail = "destinatario@gmail.com"; // E-mail do destinatário
+        string subject = "Teste de E-mail via .NET 8";
+        string body = "Este é um e-mail enviado via .NET 8 usando SMTP com SSL.";
+
+        await SendEmailAsync(smtpServer, smtpPort, senderEmail, senderPassword, recipientEmail, subject, body);
     }
+
+    static async Task SendEmailAsync(string smtpServer, int smtpPort, string senderEmail, string senderPassword, string recipientEmail, string subject, string body)
+    {
+        try
+        {
+            using SmtpClient client = new SmtpClient(smtpServer, smtpPort)
+            {
+                Credentials = new NetworkCredential(senderEmail, senderPassword),
+                EnableSsl = true
+            };
+
+            using MailMessage mail = new MailMessage(senderEmail, recipientEmail, subject, body);
+
+            await client.SendMailAsync(mail);
+            Console.WriteLine("E-mail enviado com sucesso!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao enviar e-mail: {ex.Message}");
+        }
+    }
+}
