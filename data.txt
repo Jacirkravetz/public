@@ -1,23 +1,19 @@
 using System;
-using System.Net;
-using System.Net.Mail;
 using System.Threading.Tasks;
-
-dotnet new console -n EmailSender
-cd EmailSender
-
+using MailKit.Net.Smtp;
+using MimeKit;
 
 class Program
 {
     static async Task Main(string[] args)
     {
-        string smtpServer = "smtp.gmail.com"; // Altere conforme o provedor
-        int smtpPort = 465; // SSL geralmente usa a porta 465
-        string senderEmail = "seuemail@gmail.com"; // Insira seu e-mail
-        string senderPassword = "suasenha"; // Insira sua senha ou App Password
+        string smtpServer = "smtp.gmail.com"; // SMTP do provedor (exemplo: Gmail)
+        int smtpPort = 465; // Porta 465 para SSL
+        string senderEmail = "seuemail@gmail.com"; // Seu e-mail
+        string senderPassword = "suasenha"; // Senha ou App Password
         string recipientEmail = "destinatario@gmail.com"; // E-mail do destinatário
         string subject = "Teste de E-mail via .NET 8";
-        string body = "Este é um e-mail enviado via .NET 8 usando SMTP com SSL.";
+        string body = "Este é um e-mail enviado via .NET 8 usando MailKit com SSL.";
 
         await SendEmailAsync(smtpServer, smtpPort, senderEmail, senderPassword, recipientEmail, subject, body);
     }
@@ -26,20 +22,24 @@ class Program
     {
         try
         {
-            using SmtpClient client = new SmtpClient(smtpServer, smtpPort)
-            {
-                Credentials = new NetworkCredential(senderEmail, senderPassword),
-                EnableSsl = true
-            };
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress("Remetente", senderEmail));
+            message.To.Add(new MailboxAddress("Destinatário", recipientEmail));
+            message.Subject = subject;
 
-            using MailMessage mail = new MailMessage(senderEmail, recipientEmail, subject, body);
+            message.Body = new TextPart("plain") { Text = body };
 
-            await client.SendMailAsync(mail);
-            Console.WriteLine("E-mail enviado com sucesso!");
+            using var client = new SmtpClient();
+            await client.ConnectAsync(smtpServer, smtpPort, true); // Habilita SSL
+            await client.AuthenticateAsync(senderEmail, senderPassword);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+
+            Console.WriteLine("✅ E-mail enviado com sucesso!");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao enviar e-mail: {ex.Message}");
+            Console.WriteLine($"❌ Erro ao enviar e-mail: {ex.Message}");
         }
     }
 }
