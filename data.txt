@@ -1,20 +1,33 @@
-private async Task HandleFileSelection(InputFileChangeEventArgs e)
-{
-    var file = e.File; // Captura o arquivo corretamente
-    if (file != null)
+@page "/import"
+
+<h3>Importar Epics do Excel</h3>
+
+<InputFile OnChange="HandleFileSelection" accept=".xlsx, .xls" />
+
+<p>@statusMessage</p>
+
+@code {
+    private string statusMessage = "";
+
+    private async Task HandleFileSelection(InputFileChangeEventArgs e)
     {
-        using var stream = file.OpenReadStream(); // Abre o stream
-        var epics = EpicService.ReadExcel(stream); // Passa o stream diretamente
-
-        foreach (var epic in epics)
+        var file = e.File; // Captura o arquivo selecionado
+        if (file != null)
         {
-            await EpicService.CreateEpicInGitLab(epic);
-        }
+            using var stream = file.OpenReadStream(); // Abre o stream
+            var epics = EpicService.ReadExcel(stream); // Passa o stream diretamente
 
-        statusMessage = "Epics importados com sucesso!";
-        StateHasChanged(); // Atualiza a UI
+            foreach (var epic in epics)
+            {
+                await EpicService.CreateEpicInGitLab(epic);
+            }
+
+            statusMessage = "Epics importados com sucesso!";
+            StateHasChanged(); // Atualiza a UI
+        }
     }
 }
+
 public class EpicService
 {
     private readonly IConfiguration _config;
