@@ -1,45 +1,227 @@
-using System;
-using System.Threading.Tasks;
-using MailKit.Net.Smtp;
-using MimeKit;
+📌 Passo a passo para criar o projeto
+Criar um novo projeto Blazor Server
 
-class Program
+sh
+Copiar
+Editar
+dotnet new blazorserver -n EpicImporter
+cd EpicImporter
+Instalar pacotes necessários
+
+sh
+Copiar
+Editar
+dotnet add package ExcelDataReader
+dotnet add package ExcelDataReader.DataSet
+dotnet add package Microsoft.Identity.Web
+dotnet add package Microsoft.AspNetCore.Authentication.OpenIdConnect
+dotnet add package RestSharp
+Configurar o appsettings.json Atualize o appsettings.json com os parâmetros do GitLab e Azure AD:
+
+json
+Copiar
+Editar
 {
-    static async Task Main(string[] args)
-    {
-        string smtpServer = "smtp.gmail.com"; // SMTP do provedor (exemplo: Gmail)
-        int smtpPort = 465; // Porta 465 para SSL
-        string senderEmail = "seuemail@gmail.com"; // Seu e-mail
-        string senderPassword = "suasenha"; // Senha ou App Password
-        string recipientEmail = "destinatario@gmail.com"; // E-mail do destinatário
-        string subject = "Teste de E-mail via .NET 8";
-        string body = "Este é um e-mail enviado via .NET 8 usando MailKit com SSL.";
+  "GitLab": {
+    "Token": "SEU_TOKEN",
+    "GroupId": "SEU_GROUP_ID"
+  },
+  "Authentication": {
+    "UseAzureAd": true
+  },
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "SEU_TENANT_ID",
+    "ClientId": "SEU_CLIENT_ID",
+    "CallbackPath": "/signin-oidc"
+  }
+}
+Criar a estrutura de pastas
 
-        await SendEmailAsync(smtpServer, smtpPort, senderEmail, senderPassword, recipientEmail, subject, body);
+sh
+Copiar
+Editar
+mkdir Services Models Pages
+Criar o modelo Epic.cs (Camada de Modelos)
+
+csharp
+Copiar
+Editar
+namespace EpicImporter.Models
+{
+    public class Epic
+    {
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Labels { get; set; }
     }
+}
+Criar EpicService.cs (Camada de Serviços)
 
-    static async Task SendEmailAsync(string smtpServer, int smtpPort, string senderEmail, string senderPassword, string recipientEmail, string subject, string body)
+csharp
+Copiar
+Editar
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Threading.Tasks;
+using ExcelDataReader;
+using Microsoft.Extensions.Configuration;
+using RestSharp;
+using RestSharp.Authenticators;
+using EpicImporter.Models;
+
+namespace EpicImporter.Services
+{
+    public class EpicService
     {
-        try
+        private readonly IConfiguration _config;
+
+        public EpicService(IConfiguration config)
         {
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress("Remetente", senderEmail));
-            message.To.Add(new MailboxAddress("Destinatário", recipientEmail));
-            message.Subject = subject;
-
-            message.Body = new TextPart("plain") { Text = body };
-
-            using var client = new SmtpClient();
-            await client.ConnectAsync(smtpServer, smtpPort, true); // Habilita SSL
-            await client.AuthenticateAsync(senderEmail, senderPassword);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
-
-            Console.WriteLine("✅ E-mail enviado com sucesso!");
+            _config = config;
         }
-        catch (Exception ex)
+
+        public List<Epic> ReadExcel(Stream fileStream)
         {
-            Console.WriteLine($"❌ Erro ao enviar e-mail: {ex.Message}");
+            var epics = new List<Epic>();
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+            using (var reader = ExcelReaderFactory.CreateReader(fileStream))
+            {
+                var result = reader.AsDataSet();
+                var table = result.Tables[0];
+
+                for (int i = 1; i < table.Rows.Count; i++)
+                {
+                    var row = table.Rows[i];
+                    epics.Add(new Epic
+                    {
+                        Title = row[0]?.ToString(),
+                        Description = row[1]?.ToString(),
+                        StartDate = DateTime.Parse(row[2]?.ToString()),
+                        EndDate = DateTime.Parse(row[3]?.ToString()),
+                        Labels = row[4]?.ToString()
+                    });
+                }
+            }
+            return epics;
+        }
+
+        public async Task CreateEpicInGitLab(Epic epic)
+        {
+            var token = _config["GitLab:Token"];
+            var groupId = _config["GitLab:GroupId"];
+            var client = new RestClient("https://gitlab.com/api/v4/")
+            {
+                Authenticator = new JwtAuthenticator(token)
+            };
+
+            var request = new RestRequest($"groups/{groupId}/epics", Method.Post);
+            request.AddHeader("Content-Type", "application/json");
+            request.AddJsonBody(new
+            {
+                title = epic.Title,
+                description = epic.Description,
+                start_date = epic.StartDate.ToString("yyyy-MM-dd"),
+                due_date = epic.EndDate.ToString("yyyy-MM-dd"),
+                labels = epic.Labels
+            });
+
+            var response = await client.ExecuteAsync(request);
+            if (!response.IsSuccessful)
+            {
+                throw new Exception($"Erro ao criar epic '{epic.Title}': {response.Content}");
+            }
         }
     }
 }
+Criar Upload.razor (Camada de Apresentação)
+
+razor
+Copiar
+Editar
+@page "/upload"
+@inject IConfiguration Configuration
+@inject EpicImporter.Services.EpicService EpicService
+@inject NavigationManager Navigation
+
+<h3>Importar Planilha de Epics</h3>
+
+<input type="file" @onchange="UploadFile" />
+<p>@statusMessage</p>
+
+@code {
+    private string statusMessage = "";
+
+    private async Task UploadFile(ChangeEventArgs e)
+    {
+        var files = (Microsoft.AspNetCore.Components.Forms.IBrowserFile)e.Value;
+        if (files != null)
+        {
+            using var stream = files.OpenReadStream();
+            var epics = EpicService.ReadExcel(stream);
+
+            foreach (var epic in epics)
+            {
+                await EpicService.CreateEpicInGitLab(epic);
+            }
+
+            statusMessage = "Epics importados com sucesso!";
+            StateHasChanged();
+        }
+    }
+}
+Configurar Program.cs
+
+csharp
+Copiar
+Editar
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Identity.Web;
+using EpicImporter.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configurar autenticação com Azure AD
+bool useAzureAd = builder.Configuration.GetValue<bool>("Authentication:UseAzureAd");
+if (useAzureAd)
+{
+    builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+        .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+}
+
+// Configuração de serviços
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+builder.Services.AddSingleton<EpicService>();
+
+var app = builder.Build();
+
+if (useAzureAd)
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
+
+app.UseStaticFiles();
+app.UseRouting();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+app.Run();
+Executar o projeto
+
+sh
+Copiar
+Editar
+dotnet run
+Acesse https://localhost:5001/upload para importar a planilha.
