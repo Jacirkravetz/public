@@ -1,33 +1,44 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Collections.Generic;
+using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 
 class Program
 {
-    static void Main()
+    static async Task Main()
     {
         string bootstrapServers = "localhost:9092";
+        string topic = "meu-topico";
 
-        ListConsumerGroups(bootstrapServers);
+        await GetConsumerGroupsForTopic(bootstrapServers, topic);
     }
 
-    static void ListConsumerGroups(string bootstrapServers)
+    static async Task GetConsumerGroupsForTopic(string bootstrapServers, string topic)
     {
-        using (var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build())
+        var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
+
+        using (var adminClient = new AdminClientBuilder(config).Build())
         {
             try
             {
-                var groups = adminClient.ListConsumerGroupsAsync().Result;
+                var groups = await adminClient.ListConsumerGroupsAsync();
+                var metadata = adminClient.DescribeConsumerGroups(groups.Valid.Select(g => g.GroupId));
 
-                Console.WriteLine("Consumer Groups:");
-                foreach (var group in groups.Valid)
+                Console.WriteLine($"Consumer Groups que estão lendo do tópico '{topic}':");
+
+                foreach (var group in metadata)
                 {
-                    Console.WriteLine($"- {group.GroupId}");
+                    if (group.Members.Any(m => m.Assignments.Any(a => a.Topic == topic)))
+                    {
+                        Console.WriteLine($"- {group.GroupId}");
+                    }
                 }
             }
-            catch (Exception ex)
+            catch (KafkaException ex)
             {
-                Console.WriteLine($"Erro ao listar consumer groups: {ex.Message}");
+                Console.WriteLine($"Erro ao buscar consumer groups: {ex.Error.Reason}");
             }
         }
     }
