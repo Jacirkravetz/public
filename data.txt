@@ -1,63 +1,34 @@
-@page "/import"
+using System;
+using System.Collections.Generic;
+using Confluent.Kafka.Admin;
 
-<h3>Importar Epics do Excel</h3>
-
-<InputFile OnChange="HandleFileSelection" accept=".xlsx, .xls" />
-
-<p>@statusMessage</p>
-
-@code {
-    private string statusMessage = "";
-
-    private async Task HandleFileSelection(InputFileChangeEventArgs e)
-    {
-        var file = e.File; // Captura o arquivo selecionado
-        if (file != null)
-        {
-            using var stream = file.OpenReadStream(); // Abre o stream
-            var epics = EpicService.ReadExcel(stream); // Passa o stream diretamente
-
-            foreach (var epic in epics)
-            {
-                await EpicService.CreateEpicInGitLab(epic);
-            }
-
-            statusMessage = "Epics importados com sucesso!";
-            StateHasChanged(); // Atualiza a UI
-        }
-    }
-}
-
-public class EpicService
+class Program
 {
-    private readonly IConfiguration _config;
-
-    public EpicService(IConfiguration config)
+    static void Main()
     {
-        _config = config;
+        string bootstrapServers = "localhost:9092";
+
+        ListConsumerGroups(bootstrapServers);
     }
 
-    public List<Epic> ReadExcel(Stream fileStream)
+    static void ListConsumerGroups(string bootstrapServers)
     {
-        var epics = new List<Epic>();
-        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-
-        using var reader = ExcelReaderFactory.CreateReader(fileStream);
-        var result = reader.AsDataSet();
-        var table = result.Tables[0];
-
-        for (int i = 1; i < table.Rows.Count; i++)
+        using (var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build())
         {
-            var row = table.Rows[i];
-            epics.Add(new Epic
+            try
             {
-                Title = row[0].ToString(),
-                Description = row[1].ToString(),
-                StartDate = DateTime.Parse(row[2].ToString()),
-                EndDate = DateTime.Parse(row[3].ToString()),
-                Labels = row[4].ToString()
-            });
+                var groups = adminClient.ListConsumerGroupsAsync().Result;
+
+                Console.WriteLine("Consumer Groups:");
+                foreach (var group in groups.Valid)
+                {
+                    Console.WriteLine($"- {group.GroupId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao listar consumer groups: {ex.Message}");
+            }
         }
-        return epics;
     }
 }
