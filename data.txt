@@ -1,45 +1,98 @@
 using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.IO;
+using System.Threading;
 using Confluent.Kafka;
-using Confluent.Kafka.Admin;
+using Newtonsoft.Json;
+using System.Collections.Generic;
 
 class Program
 {
-    static async Task Main()
+    static void Main()
     {
-        string bootstrapServers = "localhost:9092";
-        string topic = "meu-topico";
+        string bootstrapServers = "localhost:9092"; // Servidor do Kafka
+        string topic = "meu-topico"; // Tópico a ser consumido
+        string groupId = "grupo-consumidor"; // Nome do Consumer Group
+        string logFilePath = "consumed_messages.json"; // Caminho do arquivo de log JSON
 
-        await GetConsumerGroupsForTopic(bootstrapServers, topic);
-    }
-
-    static async Task GetConsumerGroupsForTopic(string bootstrapServers, string topic)
-    {
-        var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
-
-        using (var adminClient = new AdminClientBuilder(config).Build())
+        var config = new ConsumerConfig
         {
+            BootstrapServers = bootstrapServers,
+            GroupId = groupId,
+            AutoOffsetReset = AutoOffsetReset.Earliest // Garante que comece desde o início
+        };
+
+        // Lista para armazenar as mensagens consumidas
+        List<ConsumerLogEntry> consumedMessages = new List<ConsumerLogEntry>();
+
+        using (var consumer = new ConsumerBuilder<Ignore, string>(config).Build())
+        {
+            consumer.Subscribe(topic);
+            Console.WriteLine($"Consumindo mensagens do tópico: {topic}, Grupo: {groupId}");
+
             try
             {
-                var groups = await adminClient.ListConsumerGroupsAsync();
-                var metadata = adminClient.DescribeConsumerGroups(groups.Valid.Select(g => g.GroupId));
-
-                Console.WriteLine($"Consumer Groups que estão lendo do tópico '{topic}':");
-
-                foreach (var group in metadata)
+                while (true)
                 {
-                    if (group.Members.Any(m => m.Assignments.Any(a => a.Topic == topic)))
+                    try
                     {
-                        Console.WriteLine($"- {group.GroupId}");
+                        var consumeResult = consumer.Consume(CancellationToken.None);
+
+                        // Log detalhado da mensagem consumida
+                        var logEntry = new ConsumerLogEntry
+                        {
+                            Topic = consumeResult.Topic,
+                            Partition = consumeResult.Partition.Value,
+                            Offset = consumeResult.Offset.Value,
+                            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                            Message = consumeResult.Value,
+                            ConsumerGroup = groupId
+                        };
+
+                        consumedMessages.Add(logEntry);
+
+                        // Exibindo informações detalhadas no console
+                        Console.WriteLine($"[{logEntry.Timestamp}] - Tópico: {logEntry.Topic}, Partição: {logEntry.Partition}, " +
+                                          $"Offset: {logEntry.Offset}, Mensagem: {logEntry.Message}");
+
+                    }
+                    catch (ConsumeException e)
+                    {
+                        Console.WriteLine($"Erro ao consumir mensagem: {e.Error.Reason}");
                     }
                 }
             }
-            catch (KafkaException ex)
+            catch (OperationCanceledException)
             {
-                Console.WriteLine($"Erro ao buscar consumer groups: {ex.Error.Reason}");
+                consumer.Close();
+            }
+            finally
+            {
+                // Salvar os logs em um arquivo JSON quando o consumidor for encerrado
+                Console.WriteLine("Salvando logs de mensagens consumidas no arquivo JSON...");
+
+                try
+                {
+                    // Serializando o conteúdo para o arquivo JSON
+                    string jsonLog = JsonConvert.SerializeObject(consumedMessages, Formatting.Indented);
+                    File.WriteAllText(logFilePath, jsonLog);
+                    Console.WriteLine($"Logs salvos em: {logFilePath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erro ao salvar logs no arquivo: {ex.Message}");
+                }
             }
         }
     }
+}
+
+// Classe para armazenar os dados do log
+public class ConsumerLogEntry
+{
+    public string Topic { get; set; }
+    public int Partition { get; set; }
+    public long Offset { get; set; }
+    public string Timestamp { get; set; }
+    public string Message { get; set; }
+    public string ConsumerGroup { get; set; }
 }
