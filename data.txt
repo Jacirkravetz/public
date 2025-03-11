@@ -1,196 +1,54 @@
-using Confluent.Kafka;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-
-public interface IKafkaService
-{
-    Task<List<string>> GetConsumerGroupsAsync(string bootstrapServers);
-    Task ConsumeMessagesAsync(string bootstrapServers, string groupId, string topic, CancellationToken cancellationToken);
-}
-
-public class KafkaService : IKafkaService
-{
-    private readonly int _maxRetries = 3;
-    private readonly int _retryDelayMilliseconds = 1000;
-
-    public async Task<List<string>> GetConsumerGroupsAsync(string bootstrapServers)
-    {
-        var groups = new List<string>();
-
-        try
-        {
-            var config = new ConsumerConfig { BootstrapServers = bootstrapServers };
-
-            using (var adminClient = new AdminClientBuilder(config).Build())
-            {
-                var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(5));
-
-                foreach (var group in metadata.ConsumerGroups)
-                {
-                    groups.Add(group.GroupId);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            LogError($"Erro ao buscar grupos de consumidores: {ex.Message}");
-            throw new KafkaException("Falha ao buscar grupos de consumidores.", ex);
-        }
-
-        return await Task.FromResult(groups);
-    }
-
-    public async Task ConsumeMessagesAsync(string bootstrapServers, string groupId, string topic, CancellationToken cancellationToken)
-    {
-        var config = new ConsumerConfig
-        {
-            BootstrapServers = bootstrapServers,
-            GroupId = groupId,
-            AutoOffsetReset = AutoOffsetReset.Earliest,
-            EnableAutoCommit = false
-        };
-
-        using (var consumer = new ConsumerBuilder<Ignore, string>(config).Build())
-        {
-            consumer.Subscribe(topic);
-
-            Console.WriteLine($"Consumindo mensagens do grupo: {groupId} para o tópico: {topic}");
-
-            int retries = 0;
-            while (!cancellationToken.IsCancellationRequested && retries < _maxRetries)
-            {
-                try
-                {
-                    var consumeResult = consumer.Consume(cancellationToken);
-
-                    if (consumeResult != null)
-                    {
-                        Console.WriteLine($"[Grupo: {groupId}] Mensagem recebida: {consumeResult.Message.Value}");
-                        await SaveMessageToJsonAsync(consumeResult.Message);
-                        retries = 0; // Resetar tentativas após sucesso
-                    }
-                }
-                catch (ConsumeException e)
-                {
-                    retries++;
-                    LogError($"Erro ao consumir mensagem no grupo {groupId}: {e.Error.Reason}. Tentativa {retries}/{_maxRetries}");
-
-                    if (retries < _maxRetries)
-                    {
-                        await Task.Delay(_retryDelayMilliseconds);  // Aguardar antes de tentar novamente
-                    }
-                    else
-                    {
-                        LogError($"Falha ao consumir mensagens após {retries} tentativas. Abortando o consumo para o grupo {groupId}.");
-                        break;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Erro inesperado: {ex.Message}");
-                    throw new KafkaException("Erro inesperado no consumo de mensagens.", ex);
-                }
-            }
-
-            consumer.Close();
-        }
-    }
-
-    private async Task SaveMessageToJsonAsync(Message<Ignore, string> message)
-    {
-        try
-        {
-            var json = $"{{\"message\": \"{message.Value}\", \"timestamp\": \"{DateTime.UtcNow}\"}}";
-            var path = @"C:\caminho\para\salvar\mensagens.json"; // Substitua pelo caminho desejado
-
-            await File.AppendAllTextAsync(path, json + Environment.NewLine);
-            Console.WriteLine($"Mensagem salva em JSON: {path}");
-        }
-        catch (Exception ex)
-        {
-            LogError($"Erro ao salvar mensagem em JSON: {ex.Message}");
-        }
-    }
-
-    private void LogError(string message)
-    {
-        // Aqui você pode salvar os logs em um arquivo ou uma ferramenta de monitoramento
-        var logMessage = $"{DateTime.UtcNow}: {message}";
-        File.AppendAllText(@"C:\caminho\para\log.txt", logMessage + Environment.NewLine);
-        Console.WriteLine(logMessage);
-    }
-}
-
-public class KafkaConsumerApp
-{
-    private readonly IKafkaService _kafkaService;
-
-    public KafkaConsumerApp(IKafkaService kafkaService)
-    {
-        _kafkaService = kafkaService;
-    }
-
-    public async Task RunAsync(string bootstrapServers, string topic, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var consumerGroups = await _kafkaService.GetConsumerGroupsAsync(bootstrapServers);
-
-            var tasks = consumerGroups.Select(groupId => Task.Run(() => _kafkaService.ConsumeMessagesAsync(bootstrapServers, groupId, topic, cancellationToken)));
-
-            await Task.WhenAll(tasks);
-        }
-        catch (KafkaException ex)
-        {
-            LogError($"Erro na execução do consumidor: {ex.Message}");
-            throw;  // Pode ser tratado de maneira mais específica em um nível superior
-        }
-    }
-
-    private void LogError(string message)
-    {
-        // Loga o erro em um arquivo ou envia para um sistema de monitoramento
-        var logMessage = $"{DateTime.UtcNow}: {message}";
-        File.AppendAllText(@"C:\caminho\para\log.txt", logMessage + Environment.NewLine);
-        Console.WriteLine(logMessage);
-    }
-}
+using Confluent.Kafka;
+using Confluent.Kafka.Admin;
 
 class Program
 {
     static async Task Main(string[] args)
     {
-        var bootstrapServers = "localhost:9092";  // Endereço do Kafka
-        var topic = "meu-topico";  // Substitua pelo seu tópico
+        string bootstrapServers = "localhost:9092"; // Altere para o seu cluster
+        string topicName = "meu-topico"; // Nome do tópico que deseja consultar
 
-        // Injeção de dependência manual (pode ser substituída por um DI container como o Microsoft.Extensions.DependencyInjection)
-        var kafkaService = new KafkaService();
-        var app = new KafkaConsumerApp(kafkaService);
+        var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
 
-        // Criação do token de cancelamento
-        var cts = new CancellationTokenSource();
-
-        try
+        using (var adminClient = new AdminClientBuilder(config).Build())
         {
-            // Iniciar o consumo de mensagens
-            var runTask = app.RunAsync(bootstrapServers, topic, cts.Token);
+            try
+            {
+                // Obtendo metadados do cluster e do tópico
+                var metadata = adminClient.GetMetadata(topicName, TimeSpan.FromSeconds(5));
 
-            // Aguardar até que o usuário pressione alguma tecla para finalizar
-            Console.WriteLine("Pressione qualquer tecla para sair...");
-            Console.ReadKey();
+                Console.WriteLine("📌 Informações do Cluster:");
+                Console.WriteLine($"- Brokers disponíveis: {string.Join(", ", metadata.Brokers.Select(b => $"{b.Host}:{b.Port} (ID {b.BrokerId})"))}");
+                Console.WriteLine($"- Controlador do Cluster: Broker ID {metadata.OriginatingBrokerId}");
 
-            // Cancelar o consumo
-            cts.Cancel();
-            await runTask;
-        }
-        catch (Exception ex)
-        {
-            // Logar qualquer erro inesperado
-            Console.WriteLine($"Erro inesperado no programa: {ex.Message}");
+                if (metadata.Topics.Any())
+                {
+                    var topicMetadata = metadata.Topics.First();
+
+                    Console.WriteLine($"\n📌 Informações do Tópico: {topicMetadata.Topic}");
+                    Console.WriteLine($"- Status: {(topicMetadata.Error.IsError ? "Erro" : "OK")} ({topicMetadata.Error.Reason})");
+                    Console.WriteLine($"- Partições: {topicMetadata.Partitions.Count}");
+
+                    foreach (var partition in topicMetadata.Partitions)
+                    {
+                        Console.WriteLine($"\n  🔹 Partição {partition.PartitionId}:");
+                        Console.WriteLine($"    - Líder: {partition.Leader}");
+                        Console.WriteLine($"    - Réplicas: {string.Join(", ", partition.Replicas.Select(r => r.ToString()))}");
+                        Console.WriteLine($"    - ISR (In-Sync Replicas): {string.Join(", ", partition.InSyncReplicas.Select(r => r.ToString()))}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"❌ O tópico '{topicName}' não foi encontrado.");
+                }
+            }
+            catch (KafkaException ex)
+            {
+                Console.WriteLine($"❌ Erro ao recuperar metadados: {ex.Error.Reason}");
+            }
         }
     }
 }
