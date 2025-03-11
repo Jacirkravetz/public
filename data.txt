@@ -1,54 +1,69 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Confluent.Kafka;
-using Confluent.Kafka.Admin;
-
-class Program
 {
-    static async Task Main(string[] args)
+  "Kafka": {
+    "BootstrapServers": "localhost:9092",
+    "GroupId": "meu-grupo",
+    "SslCaPem": "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w...\n-----END CERTIFICATE-----",
+    "SslCertificatePem": "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w...\n-----END CERTIFICATE-----",
+    "SslKeyPem": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBA...\n-----END PRIVATE KEY-----",
+    "SslKeyPassword": "minhaSenha"
+  }
+}
+using System;
+using System.IO;
+using Microsoft.Extensions.Configuration;
+using Confluent.Kafka;
+
+public class KafkaService
+{
+    private readonly IConfiguration _configuration;
+    private readonly ConsumerConfig _consumerConfig;
+
+    public KafkaService()
     {
-        string bootstrapServers = "localhost:9092"; // Altere para o seu cluster
-        string topicName = "meu-topico"; // Nome do tópico que deseja consultar
+        // Carregar configurações do appsettings.json
+        _configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory()) 
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
 
-        var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
-
-        using (var adminClient = new AdminClientBuilder(config).Build())
+        // Criar configuração do consumidor Kafka com SSL
+        _consumerConfig = new ConsumerConfig
         {
-            try
+            BootstrapServers = _configuration["Kafka:BootstrapServers"],
+            GroupId = _configuration["Kafka:GroupId"],
+            AutoOffsetReset = AutoOffsetReset.Earliest,
+            EnableAutoCommit = false,
+            SecurityProtocol = SecurityProtocol.Ssl,
+            SslCaPem = _configuration["Kafka:SslCaPem"],
+            SslCertificatePem = _configuration["Kafka:SslCertificatePem"],
+            SslKeyPem = _configuration["Kafka:SslKeyPem"],
+            SslKeyPassword = _configuration["Kafka:SslKeyPassword"]
+        };
+    }
+
+    public void StartConsumer(string topic)
+    {
+        using var consumer = new ConsumerBuilder<string, string>(_consumerConfig).Build();
+        
+        consumer.Subscribe(topic);
+        Console.WriteLine($"📌 Consumindo mensagens do tópico '{topic}'...");
+
+        try
+        {
+            while (true)
             {
-                // Obtendo metadados do cluster e do tópico
-                var metadata = adminClient.GetMetadata(topicName, TimeSpan.FromSeconds(5));
-
-                Console.WriteLine("📌 Informações do Cluster:");
-                Console.WriteLine($"- Brokers disponíveis: {string.Join(", ", metadata.Brokers.Select(b => $"{b.Host}:{b.Port} (ID {b.BrokerId})"))}");
-                Console.WriteLine($"- Controlador do Cluster: Broker ID {metadata.OriginatingBrokerId}");
-
-                if (metadata.Topics.Any())
-                {
-                    var topicMetadata = metadata.Topics.First();
-
-                    Console.WriteLine($"\n📌 Informações do Tópico: {topicMetadata.Topic}");
-                    Console.WriteLine($"- Status: {(topicMetadata.Error.IsError ? "Erro" : "OK")} ({topicMetadata.Error.Reason})");
-                    Console.WriteLine($"- Partições: {topicMetadata.Partitions.Count}");
-
-                    foreach (var partition in topicMetadata.Partitions)
-                    {
-                        Console.WriteLine($"\n  🔹 Partição {partition.PartitionId}:");
-                        Console.WriteLine($"    - Líder: {partition.Leader}");
-                        Console.WriteLine($"    - Réplicas: {string.Join(", ", partition.Replicas.Select(r => r.ToString()))}");
-                        Console.WriteLine($"    - ISR (In-Sync Replicas): {string.Join(", ", partition.InSyncReplicas.Select(r => r.ToString()))}");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"❌ O tópico '{topicName}' não foi encontrado.");
-                }
+                var consumeResult = consumer.Consume();
+                Console.WriteLine($"✅ Mensagem recebida: Key={consumeResult.Message.Key}, Value={consumeResult.Message.Value}");
+                consumer.Commit(consumeResult);
             }
-            catch (KafkaException ex)
-            {
-                Console.WriteLine($"❌ Erro ao recuperar metadados: {ex.Error.Reason}");
-            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Erro no consumo: {ex.Message}");
+        }
+        finally
+        {
+            consumer.Close();
         }
     }
 }
