@@ -1,69 +1,34 @@
-{
-  "Kafka": {
-    "BootstrapServers": "localhost:9092",
-    "GroupId": "meu-grupo",
-    "SslCaPem": "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w...\n-----END CERTIFICATE-----",
-    "SslCertificatePem": "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w...\n-----END CERTIFICATE-----",
-    "SslKeyPem": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBA...\n-----END PRIVATE KEY-----",
-    "SslKeyPassword": "minhaSenha"
-  }
-}
-using System;
-using System.IO;
-using Microsoft.Extensions.Configuration;
-using Confluent.Kafka;
+DECLARE @PipelineId INT = 1; -- Defina o ID do Pipeline
+DECLARE @Sql NVARCHAR(MAX) = '';
 
-public class KafkaService
-{
-    private readonly IConfiguration _configuration;
-    private readonly ConsumerConfig _consumerConfig;
+-- Início da query principal
+SET @Sql = '
+SELECT ps.StepId, ps.StepType, ps.StepOrder, p.Name AS PipelineName, ';
 
-    public KafkaService()
-    {
-        // Carregar configurações do appsettings.json
-        _configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory()) 
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
+-- Listar as tabelas relacionadas
+SELECT @Sql += 
+' ' + QUOTENAME(t.TABLE_NAME) + '.*,' + CHAR(10)
+FROM INFORMATION_SCHEMA.TABLES t
+INNER JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME
+WHERE t.TABLE_NAME LIKE 'Step_%';
 
-        // Criar configuração do consumidor Kafka com SSL
-        _consumerConfig = new ConsumerConfig
-        {
-            BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = _configuration["Kafka:GroupId"],
-            AutoOffsetReset = AutoOffsetReset.Earliest,
-            EnableAutoCommit = false,
-            SecurityProtocol = SecurityProtocol.Ssl,
-            SslCaPem = _configuration["Kafka:SslCaPem"],
-            SslCertificatePem = _configuration["Kafka:SslCertificatePem"],
-            SslKeyPem = _configuration["Kafka:SslKeyPem"],
-            SslKeyPassword = _configuration["Kafka:SslKeyPassword"]
-        };
-    }
+-- Remover a última vírgula
+SET @Sql = LEFT(@Sql, LEN(@Sql) - 2);
 
-    public void StartConsumer(string topic)
-    {
-        using var consumer = new ConsumerBuilder<string, string>(_consumerConfig).Build();
-        
-        consumer.Subscribe(topic);
-        Console.WriteLine($"📌 Consumindo mensagens do tópico '{topic}'...");
+-- Construir o JOIN dinâmico
+SET @Sql += '
+FROM PipelineSteps ps
+JOIN Pipeline p ON ps.PipelineId = p.PipelineId ' + CHAR(10);
 
-        try
-        {
-            while (true)
-            {
-                var consumeResult = consumer.Consume();
-                Console.WriteLine($"✅ Mensagem recebida: Key={consumeResult.Message.Key}, Value={consumeResult.Message.Value}");
-                consumer.Commit(consumeResult);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Erro no consumo: {ex.Message}");
-        }
-        finally
-        {
-            consumer.Close();
-        }
-    }
-}
+SELECT @Sql += 
+' LEFT JOIN ' + QUOTENAME(t.TABLE_NAME) + ' ON ps.StepId = ' + QUOTENAME(t.TABLE_NAME) + '.StepId' + CHAR(10)
+FROM INFORMATION_SCHEMA.TABLES t
+WHERE t.TABLE_NAME LIKE 'Step_%';
+
+-- Filtros e ordenação
+SET @Sql += '
+WHERE ps.PipelineId = @PipelineId
+ORDER BY ps.StepOrder;';
+
+-- Executa a query dinâmica
+EXEC sp_executesql @Sql, N'@PipelineId INT', @PipelineId;
