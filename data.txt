@@ -1,34 +1,8 @@
-DECLARE @PipelineId INT = 1; -- Defina o ID do Pipeline
-DECLARE @Sql NVARCHAR(MAX) = '';
+ using (var privateKeyStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_config.PrivateKey)))
+        {
+            var keyFile = new PrivateKeyFile(privateKeyStream);
+            var authMethod = new PrivateKeyAuthenticationMethod(_config.Username, keyFile);
+            var connectionInfo = new ConnectionInfo(_config.ServerAddress, _config.Port, _config.Username, authMethod);
 
--- Início da query principal
-SET @Sql = '
-SELECT ps.StepId, ps.StepType, ps.StepOrder, p.Name AS PipelineName, ';
-
--- Listar as tabelas relacionadas
-SELECT @Sql += 
-' ' + QUOTENAME(t.TABLE_NAME) + '.*,' + CHAR(10)
-FROM INFORMATION_SCHEMA.TABLES t
-INNER JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME
-WHERE t.TABLE_NAME LIKE 'Step_%';
-
--- Remover a última vírgula
-SET @Sql = LEFT(@Sql, LEN(@Sql) - 2);
-
--- Construir o JOIN dinâmico
-SET @Sql += '
-FROM PipelineSteps ps
-JOIN Pipeline p ON ps.PipelineId = p.PipelineId ' + CHAR(10);
-
-SELECT @Sql += 
-' LEFT JOIN ' + QUOTENAME(t.TABLE_NAME) + ' ON ps.StepId = ' + QUOTENAME(t.TABLE_NAME) + '.StepId' + CHAR(10)
-FROM INFORMATION_SCHEMA.TABLES t
-WHERE t.TABLE_NAME LIKE 'Step_%';
-
--- Filtros e ordenação
-SET @Sql += '
-WHERE ps.PipelineId = @PipelineId
-ORDER BY ps.StepOrder;';
-
--- Executa a query dinâmica
-EXEC sp_executesql @Sql, N'@PipelineId INT', @PipelineId;
+            using (var client = new SftpClient(connectionInfo))
+            {
