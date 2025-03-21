@@ -1,8 +1,27 @@
- using (var privateKeyStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_config.PrivateKey)))
-        {
-            var keyFile = new PrivateKeyFile(privateKeyStream);
-            var authMethod = new PrivateKeyAuthenticationMethod(_config.Username, keyFile);
-            var connectionInfo = new ConnectionInfo(_config.ServerAddress, _config.Port, _config.Username, authMethod);
+public static class Util
+{
+    public static T ValidateAndConvert<T>(object? input, List<Type> allowedTypes)
+    {
+        if (input == null) throw new ArgumentNullException(nameof(input));
 
-            using (var client = new SftpClient(connectionInfo))
+        if (input is Envelope envelope)
+        {
+            if (typeof(T) == typeof(DataTable))
             {
+                if (envelope.Content is DataTable dataTable)
+                {
+                    return (T)(object)dataTable;
+                }
+                else
+                {
+                    throw new InvalidOperationException($"The Envelope content is not of type DataTable");
+                }
+            }
+        }
+        else if (!allowedTypes.Contains(input.GetType()))
+        {
+            throw new InvalidOperationException($"The format {input.GetType()} is not in the allowed formats list");
+        }
+        return (T)Convert.ChangeType(input, typeof(T));
+    }
+}
