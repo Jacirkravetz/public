@@ -1,27 +1,19 @@
-public static class Util
-{
-    public static T ValidateAndConvert<T>(object? input, List<Type> allowedTypes)
-    {
-        if (input == null) throw new ArgumentNullException(nameof(input));
+var result = Util.ValidateAndConvert<int>("123", new List<Type> { typeof(string), typeof(int) });
+Console.WriteLine(result);  // Saída: 123
 
-        if (input is Envelope envelope)
-        {
-            if (typeof(T) == typeof(DataTable))
-            {
-                if (envelope.Content is DataTable dataTable)
-                {
-                    return (T)(object)dataTable;
-                }
-                else
-                {
-                    throw new InvalidOperationException($"The Envelope content is not of type DataTable");
-                }
-            }
-        }
-        else if (!allowedTypes.Contains(input.GetType()))
-        {
-            throw new InvalidOperationException($"The format {input.GetType()} is not in the allowed formats list");
-        }
-        return (T)Convert.ChangeType(input, typeof(T));
-    }
+
+try
+{
+    var invalidResult = Util.ValidateAndConvert<double>("abc", new List<Type> { typeof(int) });
 }
+catch (Exception ex)
+{
+    Console.WriteLine(ex.Message);  // Saída: The format System.String is not in the allowed formats list
+}
+
+
+
+var dataTable = new DataTable();
+var envelope = new Envelope { Content = dataTable, Properties = new List<object>() };
+var validatedTable = Util.ValidateAndConvert<DataTable>(envelope, new List<Type> { typeof(Envelope) });
+Console.WriteLine(validatedTable.Rows.Count);  // Saída: 0 (ou conforme o conteúdo do DataTable)
