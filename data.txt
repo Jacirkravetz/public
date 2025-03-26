@@ -1,19 +1,11 @@
-var result = Util.ValidateAndConvert<int>("123", new List<Type> { typeof(string), typeof(int) });
-Console.WriteLine(result);  // Saída: 123
-
-
-try
-{
-    var invalidResult = Util.ValidateAndConvert<double>("abc", new List<Type> { typeof(int) });
-}
-catch (Exception ex)
-{
-    Console.WriteLine(ex.Message);  // Saída: The format System.String is not in the allowed formats list
-}
-
-
-
-var dataTable = new DataTable();
-var envelope = new Envelope { Content = dataTable, Properties = new List<object>() };
-var validatedTable = Util.ValidateAndConvert<DataTable>(envelope, new List<Type> { typeof(Envelope) });
-Console.WriteLine(validatedTable.Rows.Count);  // Saída: 0 (ou conforme o conteúdo do DataTable)
+SELECT
+    DB_NAME() AS DatabaseName,
+    mf.name AS FileName,
+    mf.type_desc AS FileType,
+    mf.size * 8 / 1024 AS TotalSizeMB,
+    (mf.size * 8 / 1024) - (FILEPROPERTY(mf.name, 'SpaceUsed') * 8 / 1024) AS FreeSpaceMB,
+    CAST(((mf.size * 8.0 / 1024) - (FILEPROPERTY(mf.name, 'SpaceUsed') * 8.0 / 1024)) / (mf.size * 8.0 / 1024) * 100 AS DECIMAL(5, 2)) AS FreeSpacePercent
+FROM
+    sys.master_files mf
+WHERE
+    mf.database_id = DB_ID();
