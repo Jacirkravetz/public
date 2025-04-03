@@ -1,171 +1,65 @@
-using System;
-using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
-using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Running;
-using Microsoft.IO;
-using System.Threading.Tasks;
-using System.IO.MemoryMappedFiles;
-
-public class FileReader
+public static bool ContainsSqlInjectionParallel(string filePath)
 {
-    private static readonly RecyclableMemoryStreamManager _memoryStreamManager = new();
-    private static readonly Regex SqlInjectionPattern = new("(\b(SELECT|INSERT|DELETE|UPDATE|DROP|UNION|ALTER|EXEC|DECLARE)\b)|(--|;|\'|\")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    long fileSize = new FileInfo(filePath).Length;
 
-    public static MemoryStream ReadFileToMemoryStream(string filePath)
+    if (fileSize < 100 * 1024 * 1024) // Arquivo menor que 100MB
     {
-        if (!File.Exists(filePath))
-        {
-            throw new FileNotFoundException("Arquivo não encontrado.", filePath);
-        }
-
-        using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        MemoryStream memoryStream = _memoryStreamManager.GetStream();
-        byte[] buffer = new byte[1024 * 1024]; // Buffer de 1MB
-        int bytesRead;
-
-        while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
-        {
-            memoryStream.Write(buffer, 0, bytesRead);
-        }
-
-        memoryStream.Position = 0;
-        return memoryStream;
+        return ProcessSmallFile(filePath);
     }
-
-    public static bool ContainsSqlInjection(string filePath)
+    else if (fileSize < 1L * 1024 * 1024 * 1024) // Arquivo entre 100MB e 1GB
     {
-        using StreamReader reader = new(filePath, Encoding.UTF8);
-        string? line;
-        while ((line = reader.ReadLine()) != null)
-        {
-            if (SqlInjectionPattern.IsMatch(line))
-            {
-                return true;
-            }
-        }
-        return false;
+        return ProcessMediumFile(filePath);
     }
-
-    public static bool ContainsSqlInjectionSpan(string filePath)
+    else // Arquivo maior que 1GB
     {
-        using StreamReader reader = new(filePath, Encoding.UTF8);
-        char[] buffer = new char[4096];
-        int bytesRead;
-
-        while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
-        {
-            ReadOnlySpan<char> span = buffer.AsSpan(0, bytesRead);
-            if (SqlInjectionPattern.IsMatch(span.ToString()))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static bool ContainsSqlInjectionBuffered(string filePath)
-    {
-        using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using StreamReader reader = new(fileStream, Encoding.UTF8, true, 8192);
-        
-        char[] buffer = new char[8192];
-        int bytesRead;
-        
-        while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
-        {
-            string text = new string(buffer, 0, bytesRead);
-            if (SqlInjectionPattern.IsMatch(text))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static bool ContainsSqlInjectionMemoryMapped(string filePath)
-    {
-        using var mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
-        using var stream = mmf.CreateViewStream();
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        
-        string? line;
-        while ((line = reader.ReadLine()) != null)
-        {
-            if (SqlInjectionPattern.IsMatch(line))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static bool ContainsSqlInjectionParallel(string filePath)
-    {
-        var lines = File.ReadLines(filePath, Encoding.UTF8);
-        return Parallel.ForEach(lines, (line, state) =>
-        {
-            if (SqlInjectionPattern.IsMatch(line))
-            {
-                state.Break();
-            }
-        }).IsCompleted == false;
-    }
-
-    public static bool ContainsSqlInjectionBufferReader(string filePath)
-    {
-        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.SequentialScan);
-        using var reader = new StreamReader(fileStream, Encoding.UTF8, true, 8192);
-        
-        Span<char> buffer = stackalloc char[8192];
-        while (reader.ReadBlock(buffer) > 0)
-        {
-            if (SqlInjectionPattern.IsMatch(buffer.ToString()))
-            {
-                return true;
-            }
-        }
-        return false;
+        return ProcessLargeFile(filePath);
     }
 }
 
-public class SqlInjectionBenchmark
+// 🔹 Para arquivos pequenos (< 100MB)
+private static bool ProcessSmallFile(string filePath)
 {
-    private const string TestFilePath = "test_file.txt";
-
-    [GlobalSetup]
-    public void Setup()
-    {
-        if (!File.Exists(TestFilePath))
-        {
-            File.WriteAllText(TestFilePath, "SELECT * FROM users WHERE name='admin';\nSome safe text\nUPDATE users SET password='123' WHERE id=1;\nAnother safe line");
-        }
-    }
-
-    [Benchmark]
-    public bool Validate_ContainsSqlInjection() => FileReader.ContainsSqlInjection(TestFilePath);
-
-    [Benchmark]
-    public bool Validate_ContainsSqlInjectionSpan() => FileReader.ContainsSqlInjectionSpan(TestFilePath);
-
-    [Benchmark]
-    public bool Validate_ContainsSqlInjectionBuffered() => FileReader.ContainsSqlInjectionBuffered(TestFilePath);
-
-    [Benchmark]
-    public bool Validate_ContainsSqlInjectionMemoryMapped() => FileReader.ContainsSqlInjectionMemoryMapped(TestFilePath);
-
-    [Benchmark]
-    public bool Validate_ContainsSqlInjectionParallel() => FileReader.ContainsSqlInjectionParallel(TestFilePath);
-
-    [Benchmark]
-    public bool Validate_ContainsSqlInjectionBufferReader() => FileReader.ContainsSqlInjectionBufferReader(TestFilePath);
+    string[] lines = File.ReadAllLines(filePath, Encoding.UTF8);
+    return lines.AsParallel()
+                .WithDegreeOfParallelism(Environment.ProcessorCount)
+                .Any(line => SqlInjectionPattern.IsMatch(line));
 }
 
-class Program
+// 🔹 Para arquivos médios (100MB – 1GB)
+private static bool ProcessMediumFile(string filePath)
 {
-    static void Main(string[] args)
+    const int bufferSize = 8192; // 8KB buffer
+    using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, FileOptions.SequentialScan);
+    using var reader = new StreamReader(fileStream, Encoding.UTF8, true, bufferSize);
+    
+    var lines = new ConcurrentBag<string>();
+    string? line;
+    
+    while ((line = reader.ReadLine()) != null)
     {
-        var summary = BenchmarkRunner.Run<SqlInjectionBenchmark>();
+        lines.Add(line);
     }
+
+    return lines.AsParallel()
+                .WithDegreeOfParallelism(Environment.ProcessorCount)
+                .Any(line => SqlInjectionPattern.IsMatch(line));
+}
+
+// 🔹 Para arquivos grandes (> 1GB)
+private static bool ProcessLargeFile(string filePath)
+{
+    using var mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+    using var stream = mmf.CreateViewStream();
+    using var reader = new StreamReader(stream, Encoding.UTF8);
+    
+    string? line;
+    while ((line = reader.ReadLine()) != null)
+    {
+        if (SqlInjectionPattern.IsMatch(line))
+        {
+            return true; // Encontrou SQL Injection
+        }
+    }
+    
+    return false; // Não encontrou SQL Injection
 }
