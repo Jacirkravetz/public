@@ -1,111 +1,49 @@
 using System;
-using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Collections.Generic;
-
-public class FileProcessor
-{
-    private static readonly Regex SqlInjectionPattern = new(
-        @"(\b(SELECT|INSERT|DELETE|UPDATE|DROP|UNION|ALTER|EXEC|DECLARE)\b)|(--|;|\'|\")",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled
-    );
-
-    /// <summary>
-    /// Selects the best processing method based on file size.
-    /// </summary>
-    public static bool DetectSqlInjection(string filePath)
-    {
-        long fileSize = new FileInfo(filePath).Length;
-
-        if (fileSize <= 1_000_000)  // Up to 1MB
-            return ProcessSmallFile(filePath);
-        if (fileSize <= 10_000_000) // 1MB to 10MB
-            return ProcessMediumFile(filePath);
-        else // Over 10MB
-            return ProcessVeryLargeFile(filePath);
-    }
-
-    /// <summary>
-    /// Processes files up to 1MB using simple line-by-line reading.
-    /// </summary>
-    private static bool ProcessSmallFile(string filePath)
-    {
-        foreach (string line in File.ReadLines(filePath, Encoding.UTF8))
-        {
-            if (SqlInjectionPattern.IsMatch(line))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Processes files between 1MB and 10MB using buffered reading.
-    /// </summary>
-    private static bool ProcessMediumFile(string filePath)
-    {
-        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.SequentialScan);
-        using var reader = new StreamReader(fileStream, Encoding.UTF8, true, 8192);
-        
-        char[] buffer = new char[8192];
-        int bytesRead;
-
-        while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
-        {
-            string text = new string(buffer, 0, bytesRead);
-            if (SqlInjectionPattern.IsMatch(text))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Processes files larger than 10MB using parallel processing and buffered streaming.
-    /// </summary>
-    private static bool ProcessVeryLargeFile(string filePath)
-    {
-        const int bufferSize = 65536; // 64KB buffer
-        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, FileOptions.SequentialScan);
-        using var reader = new StreamReader(fileStream, Encoding.UTF8, true, bufferSize);
-        
-        var tasks = new List<Task<bool>>();
-        bool found = false;
-        object lockObj = new();
-
-        string? line;
-        while ((line = reader.ReadLine()) != null)
-        {
-            if (found) break; // Stop immediately if match is found
-
-            tasks.Add(Task.Run(() =>
-            {
-                if (SqlInjectionPattern.IsMatch(line))
-                {
-                    lock (lockObj) { found = true; }
-                    return true;
-                }
-                return false;
-            }));
-        }
-
-        Task.WaitAll(tasks.ToArray());
-        return found;
-    }
-}
+using System.IO;
+using System.Linq;
 
 class Program
 {
-    static void Main(string[] args)
+    static void Main()
     {
-        string filePath = "test_file.txt";
-        
-        if (!File.Exists(filePath))
+        string filePath = "caminho_do_arquivo.csv";
+
+        char detectedDelimiter = DetectDelimiter(filePath);
+        Console.WriteLine($"Delimitador detectado: '{(detectedDelimiter == '\t' ? "TAB" : detectedDelimiter.ToString())}'");
+
+        // Agora você pode processar o arquivo corretamente com o delimitador detectado
+    }
+
+    static char DetectDelimiter(string filePath)
+    {
+        // Lista de delimitadores comuns
+        char[] commonDelimiters = { ',', ';', '\t', '|', ':', ' ', '/', '\\', '-', '*', '@', '!', '#', '$', '=', '~' };
+        Dictionary<char, int> delimiterCounts = new Dictionary<char, int>();
+
+        // Inicializa o contador para cada delimitador
+        foreach (char delimiter in commonDelimiters)
         {
-            File.WriteAllText(filePath, "SELECT * FROM users WHERE name='admin';\nSome safe text\nUPDATE users SET password='123' WHERE id=1;\nAnother safe line");
+            delimiterCounts[delimiter] = 0;
         }
 
-        bool hasSqlInjection = FileProcessor.DetectSqlInjection(filePath);
-        Console.WriteLine($"SQL Injection detected: {hasSqlInjection}");
+        using (StreamReader reader = new StreamReader(filePath))
+        {
+            int linesToCheck = 10; // Número de linhas analisadas (pode ser ajustado)
+            for (int i = 0; i < linesToCheck; i++)
+            {
+                string? line = reader.ReadLine();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                foreach (char delimiter in commonDelimiters)
+                {
+                    int count = line.Count(c => c == delimiter);
+                    delimiterCounts[delimiter] += count;
+                }
+            }
+        }
+
+        // Retorna o delimitador que apareceu mais vezes
+        return delimiterCounts.OrderByDescending(d => d.Value).First().Key;
     }
 }
