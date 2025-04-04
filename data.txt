@@ -1,65 +1,111 @@
-public static bool ContainsSqlInjectionParallel(string filePath)
-{
-    long fileSize = new FileInfo(filePath).Length;
+using System;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
-    if (fileSize < 100 * 1024 * 1024) // Arquivo menor que 100MB
-    {
-        return ProcessSmallFile(filePath);
-    }
-    else if (fileSize < 1L * 1024 * 1024 * 1024) // Arquivo entre 100MB e 1GB
-    {
-        return ProcessMediumFile(filePath);
-    }
-    else // Arquivo maior que 1GB
-    {
-        return ProcessLargeFile(filePath);
-    }
-}
-
-// 🔹 Para arquivos pequenos (< 100MB)
-private static bool ProcessSmallFile(string filePath)
+public class FileProcessor
 {
-    string[] lines = File.ReadAllLines(filePath, Encoding.UTF8);
-    return lines.AsParallel()
-                .WithDegreeOfParallelism(Environment.ProcessorCount)
-                .Any(line => SqlInjectionPattern.IsMatch(line));
-}
+    private static readonly Regex SqlInjectionPattern = new(
+        @"(\b(SELECT|INSERT|DELETE|UPDATE|DROP|UNION|ALTER|EXEC|DECLARE)\b)|(--|;|\'|\")",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
 
-// 🔹 Para arquivos médios (100MB – 1GB)
-private static bool ProcessMediumFile(string filePath)
-{
-    const int bufferSize = 8192; // 8KB buffer
-    using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, FileOptions.SequentialScan);
-    using var reader = new StreamReader(fileStream, Encoding.UTF8, true, bufferSize);
-    
-    var lines = new ConcurrentBag<string>();
-    string? line;
-    
-    while ((line = reader.ReadLine()) != null)
+    /// <summary>
+    /// Selects the best processing method based on file size.
+    /// </summary>
+    public static bool DetectSqlInjection(string filePath)
     {
-        lines.Add(line);
+        long fileSize = new FileInfo(filePath).Length;
+
+        if (fileSize <= 1_000_000)  // Up to 1MB
+            return ProcessSmallFile(filePath);
+        if (fileSize <= 10_000_000) // 1MB to 10MB
+            return ProcessMediumFile(filePath);
+        else // Over 10MB
+            return ProcessVeryLargeFile(filePath);
     }
 
-    return lines.AsParallel()
-                .WithDegreeOfParallelism(Environment.ProcessorCount)
-                .Any(line => SqlInjectionPattern.IsMatch(line));
-}
-
-// 🔹 Para arquivos grandes (> 1GB)
-private static bool ProcessLargeFile(string filePath)
-{
-    using var mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
-    using var stream = mmf.CreateViewStream();
-    using var reader = new StreamReader(stream, Encoding.UTF8);
-    
-    string? line;
-    while ((line = reader.ReadLine()) != null)
+    /// <summary>
+    /// Processes files up to 1MB using simple line-by-line reading.
+    /// </summary>
+    private static bool ProcessSmallFile(string filePath)
     {
-        if (SqlInjectionPattern.IsMatch(line))
+        foreach (string line in File.ReadLines(filePath, Encoding.UTF8))
         {
-            return true; // Encontrou SQL Injection
+            if (SqlInjectionPattern.IsMatch(line))
+                return true;
         }
+        return false;
     }
-    
-    return false; // Não encontrou SQL Injection
+
+    /// <summary>
+    /// Processes files between 1MB and 10MB using buffered reading.
+    /// </summary>
+    private static bool ProcessMediumFile(string filePath)
+    {
+        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.SequentialScan);
+        using var reader = new StreamReader(fileStream, Encoding.UTF8, true, 8192);
+        
+        char[] buffer = new char[8192];
+        int bytesRead;
+
+        while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            string text = new string(buffer, 0, bytesRead);
+            if (SqlInjectionPattern.IsMatch(text))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Processes files larger than 10MB using parallel processing and buffered streaming.
+    /// </summary>
+    private static bool ProcessVeryLargeFile(string filePath)
+    {
+        const int bufferSize = 65536; // 64KB buffer
+        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, FileOptions.SequentialScan);
+        using var reader = new StreamReader(fileStream, Encoding.UTF8, true, bufferSize);
+        
+        var tasks = new List<Task<bool>>();
+        bool found = false;
+        object lockObj = new();
+
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+        {
+            if (found) break; // Stop immediately if match is found
+
+            tasks.Add(Task.Run(() =>
+            {
+                if (SqlInjectionPattern.IsMatch(line))
+                {
+                    lock (lockObj) { found = true; }
+                    return true;
+                }
+                return false;
+            }));
+        }
+
+        Task.WaitAll(tasks.ToArray());
+        return found;
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        string filePath = "test_file.txt";
+        
+        if (!File.Exists(filePath))
+        {
+            File.WriteAllText(filePath, "SELECT * FROM users WHERE name='admin';\nSome safe text\nUPDATE users SET password='123' WHERE id=1;\nAnother safe line");
+        }
+
+        bool hasSqlInjection = FileProcessor.DetectSqlInjection(filePath);
+        Console.WriteLine($"SQL Injection detected: {hasSqlInjection}");
+    }
 }
