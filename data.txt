@@ -8,9 +8,18 @@ class Program
     static void Main()
     {
         string filePath = "caminho_do_arquivo.csv";
+        char expectedDelimiter = ';'; // Altere para o delimitador esperado
 
         char detectedDelimiter = DetectDelimiter(filePath);
+
         Console.WriteLine($"Delimitador detectado: '{(detectedDelimiter == '\t' ? "TAB" : detectedDelimiter.ToString())}'");
+
+        // Validação para verificar se o delimitador detectado é o esperado
+        if (detectedDelimiter != expectedDelimiter)
+        {
+            Console.WriteLine($"⚠️ ATENÇÃO: O delimitador esperado era '{expectedDelimiter}', mas foi detectado '{detectedDelimiter}'.");
+            Console.WriteLine("Verifique se o arquivo está correto ou ajuste a configuração.");
+        }
 
         // Agora você pode processar o arquivo corretamente com o delimitador detectado
     }
