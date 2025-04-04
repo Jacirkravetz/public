@@ -7,30 +7,30 @@ class Program
 {
     static void Main()
     {
-        string filePath = "caminho_do_arquivo.csv";
-        char expectedDelimiter = ';'; // Altere para o delimitador esperado
+        string filePath = "path_to_your_file.csv";
+        char expectedDelimiter = ';'; // Change this to the expected delimiter
 
         char detectedDelimiter = DetectDelimiter(filePath);
 
-        Console.WriteLine($"Delimitador detectado: '{(detectedDelimiter == '\t' ? "TAB" : detectedDelimiter.ToString())}'");
+        Console.WriteLine($"Detected delimiter: '{(detectedDelimiter == '\t' ? "TAB" : detectedDelimiter.ToString())}'");
 
-        // Validação para verificar se o delimitador detectado é o esperado
+        // Validation to check if the detected delimiter matches the expected one
         if (detectedDelimiter != expectedDelimiter)
         {
-            Console.WriteLine($"⚠️ ATENÇÃO: O delimitador esperado era '{expectedDelimiter}', mas foi detectado '{detectedDelimiter}'.");
-            Console.WriteLine("Verifique se o arquivo está correto ou ajuste a configuração.");
+            Console.WriteLine($"⚠️ WARNING: Expected delimiter was '{expectedDelimiter}', but detected '{detectedDelimiter}'.");
+            Console.WriteLine("Please check if the file is correct or adjust the configuration.");
         }
 
-        // Agora você pode processar o arquivo corretamente com o delimitador detectado
+        // Now you can process the file correctly using the detected delimiter
     }
 
     static char DetectDelimiter(string filePath)
     {
-        // Lista de delimitadores comuns
+        // List of common delimiters
         char[] commonDelimiters = { ',', ';', '\t', '|', ':', ' ', '/', '\\', '-', '*', '@', '!', '#', '$', '=', '~' };
         Dictionary<char, int> delimiterCounts = new Dictionary<char, int>();
 
-        // Inicializa o contador para cada delimitador
+        // Initialize the counter for each delimiter
         foreach (char delimiter in commonDelimiters)
         {
             delimiterCounts[delimiter] = 0;
@@ -38,7 +38,7 @@ class Program
 
         using (StreamReader reader = new StreamReader(filePath))
         {
-            int linesToCheck = 10; // Número de linhas analisadas (pode ser ajustado)
+            int linesToCheck = 10; // Number of lines to analyze (adjustable)
             for (int i = 0; i < linesToCheck; i++)
             {
                 string? line = reader.ReadLine();
@@ -52,7 +52,7 @@ class Program
             }
         }
 
-        // Retorna o delimitador que apareceu mais vezes
+        // Returns the most frequently occurring delimiter
         return delimiterCounts.OrderByDescending(d => d.Value).First().Key;
     }
 }
