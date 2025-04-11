@@ -1,58 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-
-class Program
-{
-    static void Main()
-    {
-        string filePath = "path_to_your_file.csv";
-        char expectedDelimiter = ';'; // Change this to the expected delimiter
-
-        char detectedDelimiter = DetectDelimiter(filePath);
-
-        Console.WriteLine($"Detected delimiter: '{(detectedDelimiter == '\t' ? "TAB" : detectedDelimiter.ToString())}'");
-
-        // Validation to check if the detected delimiter matches the expected one
-        if (detectedDelimiter != expectedDelimiter)
-        {
-            Console.WriteLine($"⚠️ WARNING: Expected delimiter was '{expectedDelimiter}', but detected '{detectedDelimiter}'.");
-            Console.WriteLine("Please check if the file is correct or adjust the configuration.");
-        }
-
-        // Now you can process the file correctly using the detected delimiter
+ "Proxy": {
+      "Protocol": "http",
+      "Address": "proxy.seudominio.local:8080",
+      "Username": "usuario",
+      "Password": "senha"
     }
 
-    static char DetectDelimiter(string filePath)
-    {
-        // List of common delimiters
-        char[] commonDelimiters = { ',', ';', '\t', '|', ':', ' ', '/', '\\', '-', '*', '@', '!', '#', '$', '=', '~' };
-        Dictionary<char, int> delimiterCounts = new Dictionary<char, int>();
 
-        // Initialize the counter for each delimiter
-        foreach (char delimiter in commonDelimiters)
-        {
-            delimiterCounts[delimiter] = 0;
-        }
-
-        using (StreamReader reader = new StreamReader(filePath))
-        {
-            int linesToCheck = 10; // Number of lines to analyze (adjustable)
-            for (int i = 0; i < linesToCheck; i++)
-            {
-                string? line = reader.ReadLine();
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                foreach (char delimiter in commonDelimiters)
-                {
-                    int count = line.Count(c => c == delimiter);
-                    delimiterCounts[delimiter] += count;
-                }
-            }
-        }
-
-        // Returns the most frequently occurring delimiter
-        return delimiterCounts.OrderByDescending(d => d.Value).First().Key;
-    }
-}
+config.Set("proxy.protocol", settings["Kafka:Proxy:Protocol"]);
+config.Set("proxy.address", settings["Kafka:Proxy:Address"]);
+config.Set("proxy.username", settings["Kafka:Proxy:Username"]);
+config.Set("proxy.password", settings["Kafka:Proxy:Password"]);
