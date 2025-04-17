@@ -1,12 +1,68 @@
- "Proxy": {
-      "Protocol": "http",
-      "Address": "proxy.seudominio.local:8080",
-      "Username": "usuario",
-      "Password": "senha"
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Confluent.Kafka;
+using Confluent.SchemaRegistry;
+using Confluent.SchemaRegistry.Serdes;
+using KafkaProducerWithSchema.Model;
+
+class Program
+{
+    static async Task Main()
+    {
+        var bootstrapServers = "localhost:9092";
+        var schemaRegistryUrl = "http://localhost:8081";
+        var topic = "pessoas";
+
+        var proxy = new WebProxy("http://meuproxy.local:3128")
+        {
+            Credentials = new NetworkCredential("usuario", "senha")
+        };
+
+        var handler = new HttpClientHandler
+        {
+            Proxy = proxy,
+            UseProxy = true
+        };
+
+        var httpClient = new HttpClient(handler);
+
+        var schemaRegistryConfig = new SchemaRegistryConfig
+        {
+            Url = schemaRegistryUrl
+        };
+
+        var schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryConfig, httpClient);
+
+        var producerConfig = new ProducerConfig
+        {
+            BootstrapServers = bootstrapServers
+        };
+
+        using var producer = new ProducerBuilder<string, Pessoa>(producerConfig)
+            .SetValueSerializer(new AvroSerializer<Pessoa>(schemaRegistry))
+            .Build();
+
+        var pessoa = new Pessoa
+        {
+            nome = "João do Proxy",
+            idade = 45
+        };
+
+        try
+        {
+            var result = await producer.ProduceAsync(topic, new Message<string, Pessoa>
+            {
+                Key = Guid.NewGuid().ToString(),
+                Value = pessoa
+            });
+
+            Console.WriteLine($"Mensagem enviada para: {result.TopicPartitionOffset}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao enviar mensagem: {ex.Message}");
+        }
     }
-
-
-config.Set("proxy.protocol", settings["Kafka:Proxy:Protocol"]);
-config.Set("proxy.address", settings["Kafka:Proxy:Address"]);
-config.Set("proxy.username", settings["Kafka:Proxy:Username"]);
-config.Set("proxy.password", settings["Kafka:Proxy:Password"]);
+}
