@@ -1,1 +1,35 @@
-http://<schema-registry-host>:8081/subjects/<topic>-value/versions/latest
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main()
+    {
+        string srUrl = "https://northeurope.azure.confluent.cloud";
+        string subject = "pessoas-value";
+        string apiKey = "YOUR_SR_API_KEY";
+        string apiSecret = "YOUR_SR_API_SECRET";
+
+        var client = new HttpClient();
+        var authBytes = Encoding.ASCII.GetBytes($"{apiKey}:{apiSecret}");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
+
+        var response = await client.GetAsync($"{srUrl}/subjects/{subject}/versions/latest");
+
+        if (response.IsSuccessStatusCode)
+        {
+            string schemaJson = await response.Content.ReadAsStringAsync();
+            Console.WriteLine("Schema encontrado:");
+            Console.WriteLine(schemaJson);
+        }
+        else
+        {
+            Console.WriteLine($"Erro ao consultar schema: {response.StatusCode}");
+            string errorDetails = await response.Content.ReadAsStringAsync();
+            Console.WriteLine(errorDetails);
+        }
+    }
+}
