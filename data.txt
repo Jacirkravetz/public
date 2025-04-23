@@ -1,35 +1,17 @@
-using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Threading.Tasks;
-
-class Program
-{
-    static async Task Main()
-    {
-        string srUrl = "https://northeurope.azure.confluent.cloud";
-        string subject = "pessoas-value";
-        string apiKey = "YOUR_SR_API_KEY";
-        string apiSecret = "YOUR_SR_API_SECRET";
-
-        var client = new HttpClient();
-        var authBytes = Encoding.ASCII.GetBytes($"{apiKey}:{apiSecret}");
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
-
-        var response = await client.GetAsync($"{srUrl}/subjects/{subject}/versions/latest");
-
-        if (response.IsSuccessStatusCode)
-        {
-            string schemaJson = await response.Content.ReadAsStringAsync();
-            Console.WriteLine("Schema encontrado:");
-            Console.WriteLine(schemaJson);
-        }
-        else
-        {
-            Console.WriteLine($"Erro ao consultar schema: {response.StatusCode}");
-            string errorDetails = await response.Content.ReadAsStringAsync();
-            Console.WriteLine(errorDetails);
-        }
-    }
-}
+DataFormatada = 
+VAR DataTxt = 'Tabela'[DataTexto]
+RETURN
+IF (
+    LEN(DataTxt) = 10 &&
+    MID(DataTxt, 3, 1) = "/" &&
+    MID(DataTxt, 6, 1) = "/" &&
+    ISNUMBER(VALUE(LEFT(DataTxt, 2))) &&
+    ISNUMBER(VALUE(MID(DataTxt, 4, 2))) &&
+    ISNUMBER(VALUE(RIGHT(DataTxt, 4))),
+    DATE(
+        VALUE(RIGHT(DataTxt, 4)),         -- Ano
+        VALUE(MID(DataTxt, 4, 2)),        -- Mês
+        VALUE(LEFT(DataTxt, 2))           -- Dia
+    ),
+    BLANK() -- ou você pode colocar um valor padrão, tipo DATE(1900,1,1)
+)
