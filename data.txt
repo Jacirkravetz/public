@@ -1,8 +1,8 @@
-StatusVencimento = 
-VAR DataValida = 'Tabela'[DataFormatada]
+DueStatus = 
+VAR ValidDate = 'Table'[FormattedDate]
 RETURN
 IF (
-    NOT ISBLANK(DataValida),
-    IF (DataValida < TODAY(), "Vencido", "A vencer"),
-    BLANK() -- ou "Data inválida", se preferir
+    NOT ISBLANK(ValidDate),
+    IF (ValidDate < TODAY(), "Overdue", "Upcoming"),
+    BLANK() -- or "Invalid Date" if you prefer
 )
