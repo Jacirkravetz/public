@@ -1,86 +1,203 @@
 using System;
-using System.Collections.Generic;
-using System.Data;
-using System.IO;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Apache.Avro;
-using Apache.Avro.Generic;
-using Confluent.Kafka;
+using Avro.Specific;
 
-namespace KafkaProducerAvro
+public interface IKafkaCloudOperationWrapper<T> : IDisposable where T : class, ISpecificRecord
 {
-    public class KafkaAvroProducer
+    void ProcessSendKafkaCloud(KafkaConfigProducerParameter producerConfig);
+    void ProcessConsumerKafkaCloud(KafkaConfigConsumerParameter consumerConfig);
+
+    Task SendMessageAsync(string key, T value);
+    Task ConsumeMessagesAsync(Func<string, T, Task> handleMessage, CancellationToken cancellationToken);
+
+    void Subscribe(string topic);
+}
+
+
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Confluent.Kafka;
+using Confluent.SchemaRegistry;
+using Confluent.SchemaRegistry.Serdes;
+using Avro.Specific;
+
+public class KafkaCloudOperationWrapper<T> : IKafkaCloudOperationWrapper<T> where T : class, ISpecificRecord
+{
+    private KafkaConfigProducerParameter _producerConfigParam;
+    private KafkaConfigConsumerParameter _consumerConfigParam;
+    private ISchemaRegistryClient _schemaRegistryClient;
+    private IProducer<string, T> _producer;
+    private IConsumer<string, T> _consumer;
+    private bool _disposed;
+
+    public KafkaCloudOperationWrapper() {}
+
+    public void ProcessSendKafkaCloud(KafkaConfigProducerParameter producerConfig)
     {
-        private readonly string _bootstrapServers;
-        private readonly string _topic;
-        private readonly Schema _schema;
+        if (_disposed) throw new ObjectDisposedException(nameof(KafkaCloudOperationWrapper<T>));
+        if (producerConfig == null) throw new ArgumentNullException(nameof(producerConfig));
 
-        public KafkaAvroProducer(string bootstrapServers, string topic, string avroSchemaJson)
+        _producerConfigParam = producerConfig;
+
+        var config = new ProducerConfig
         {
-            _bootstrapServers = bootstrapServers;
-            _topic = topic;
-            _schema = Schema.Parse(avroSchemaJson);
+            BootstrapServers = producerConfig.BootstrapServers,
+            Acks = producerConfig.Acks,
+            MessageTimeoutMs = producerConfig.MessageTimeoutMs,
+            BatchSize = producerConfig.BatchSize,
+            LingerMs = producerConfig.LingerMs
+        };
+
+        foreach (var kvp in producerConfig.AdditionalConfig)
+            config.Set(kvp.Key, kvp.Value);
+
+        _schemaRegistryClient = new CachedSchemaRegistryClient(new SchemaRegistryConfig
+        {
+            Url = producerConfig.SchemaRegistryUrl
+        });
+
+        _producer = new ProducerBuilder<string, T>(config)
+            .SetValueSerializer(new AvroSerializer<T>(_schemaRegistryClient))
+            .Build();
+    }
+
+    public void ProcessConsumerKafkaCloud(KafkaConfigConsumerParameter consumerConfig)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(KafkaCloudOperationWrapper<T>));
+        if (consumerConfig == null) throw new ArgumentNullException(nameof(consumerConfig));
+
+        _consumerConfigParam = consumerConfig;
+
+        var config = new ConsumerConfig
+        {
+            BootstrapServers = consumerConfig.BootstrapServers,
+            GroupId = consumerConfig.GroupId,
+            AutoOffsetReset = consumerConfig.AutoOffsetReset,
+            EnableAutoCommit = consumerConfig.EnableAutoCommit
+        };
+
+        foreach (var kvp in consumerConfig.AdditionalConfig)
+            config.Set(kvp.Key, kvp.Value);
+
+        _schemaRegistryClient ??= new CachedSchemaRegistryClient(new SchemaRegistryConfig
+        {
+            Url = consumerConfig.SchemaRegistryUrl
+        });
+
+        _consumer = new ConsumerBuilder<string, T>(config)
+            .SetValueDeserializer(new AvroDeserializer<T>(_schemaRegistryClient).AsSyncOverAsync())
+            .Build();
+    }
+
+    public void Subscribe(string topic)
+    {
+        if (_consumer == null)
+            throw new InvalidOperationException("Consumer ainda não foi criado. Chame ProcessConsumerKafkaCloud primeiro.");
+
+        _consumer.Subscribe(topic);
+    }
+
+    public async Task SendMessageAsync(string key, T value)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(KafkaCloudOperationWrapper<T>));
+        if (_producer == null)
+            throw new InvalidOperationException("Producer ainda não foi criado. Chame ProcessSendKafkaCloud primeiro.");
+
+        var message = new Message<string, T>
+        {
+            Key = key,
+            Value = value
+        };
+
+        try
+        {
+            var result = await _producer.ProduceAsync(_producerConfigParam.Topic, message);
+            Console.WriteLine($"Mensagem enviada para {result.TopicPartitionOffset}");
         }
-
-        public async Task SendMessagesAsync(DataTable dataTable)
+        catch (ProduceException<string, T> ex)
         {
-            var config = new ProducerConfig
-            {
-                BootstrapServers = _bootstrapServers
-            };
+            Console.WriteLine($"Erro ao enviar mensagem: {ex.Error.Reason}");
+            throw;
+        }
+    }
 
-            using (var producer = new ProducerBuilder<string, byte[]>(config).Build())
+    public async Task ConsumeMessagesAsync(Func<string, T, Task> handleMessage, CancellationToken cancellationToken)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(KafkaCloudOperationWrapper<T>));
+        if (_consumer == null)
+            throw new InvalidOperationException("Consumer ainda não foi criado. Chame ProcessConsumerKafkaCloud primeiro.");
+
+        _consumer.Subscribe(_consumerConfigParam.Topic);
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
             {
-                foreach (DataRow row in dataTable.Rows)
+                var consumeResult = _consumer.Consume(cancellationToken);
+                if (consumeResult != null)
                 {
-                    var record = CreateGenericRecord(row);
-                    var avroBytes = SerializeRecordToAvro(record);
-
-                    var message = new Message<string, byte[]>
-                    {
-                        Key = Guid.NewGuid().ToString(), // Pode ser ajustado conforme sua necessidade
-                        Value = avroBytes
-                    };
-
-                    var deliveryResult = await producer.ProduceAsync(_topic, message);
-
-                    Console.WriteLine($"Mensagem enviada para {deliveryResult.TopicPartitionOffset}");
+                    await handleMessage(consumeResult.Message.Key, consumeResult.Message.Value);
                 }
             }
-        }
-
-        private GenericRecord CreateGenericRecord(DataRow row)
-        {
-            var record = new GenericRecord((RecordSchema)_schema);
-
-            foreach (DataColumn column in row.Table.Columns)
+            catch (ConsumeException ex)
             {
-                if (row[column] == DBNull.Value)
-                {
-                    record.Add(column.ColumnName, null);
-                }
-                else
-                {
-                    record.Add(column.ColumnName, row[column]);
-                }
+                Console.WriteLine($"Erro ao consumir mensagem: {ex.Error.Reason}");
             }
-
-            return record;
-        }
-
-        private byte[] SerializeRecordToAvro(GenericRecord record)
-        {
-            using (var stream = new MemoryStream())
+            catch (OperationCanceledException)
             {
-                var writer = new BinaryEncoder(stream);
-                var avroWriter = new GenericWriter<GenericRecord>(_schema);
-
-                avroWriter.Write(record, writer);
-                writer.Flush();
-
-                return stream.ToArray();
+                Console.WriteLine("Consumo cancelado.");
             }
         }
     }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        _producer?.Flush(TimeSpan.FromSeconds(10));
+        _producer?.Dispose();
+        _consumer?.Close();
+        _consumer?.Dispose();
+        _schemaRegistryClient?.Dispose();
+
+        _disposed = true;
+    }
 }
+
+
+
+
+var producerConfig = new KafkaConfigProducerParameter
+{
+    BootstrapServers = "localhost:9092",
+    SchemaRegistryUrl = "http://localhost:8081",
+    Topic = "topico-producer",
+    Acks = Acks.All
+};
+
+var consumerConfig = new KafkaConfigConsumerParameter
+{
+    BootstrapServers = "localhost:9092",
+    SchemaRegistryUrl = "http://localhost:8081",
+    Topic = "topico-consumer",
+    GroupId = "grupo-consumer",
+    AutoOffsetReset = AutoOffsetReset.Earliest,
+    EnableAutoCommit = true
+};
+
+using IKafkaCloudOperationWrapper<User> kafka = new KafkaCloudOperationWrapper<User>();
+
+kafka.ProcessSendKafkaCloud(producerConfig);
+await kafka.SendMessageAsync("key1", new User { id = "1", name = "Alice", age = 30 });
+
+kafka.ProcessConsumerKafkaCloud(consumerConfig);
+
+var cts = new CancellationTokenSource();
+await kafka.ConsumeMessagesAsync(async (key, user) =>
+{
+    Console.WriteLine($"Recebido: {key} => {user.name}");
+    await Task.CompletedTask;
+}, cts.Token);
