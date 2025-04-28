@@ -1,85 +1,86 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using Apache.Avro;
+using Apache.Avro.Generic;
 using Confluent.Kafka;
-using Avro;
-using Avro.Generic;
-using Avro.IO;
 
-public class KafkaAvroManualProducer
+namespace KafkaProducerAvro
 {
-    private readonly string _bootstrapServers;
-    private readonly string _topicName;
-
-    public KafkaAvroManualProducer(string bootstrapServers, string topicName)
+    public class KafkaAvroProducer
     {
-        _bootstrapServers = bootstrapServers;
-        _topicName = topicName;
-    }
+        private readonly string _bootstrapServers;
+        private readonly string _topic;
+        private readonly Schema _schema;
 
-    public async Task SendMessagesAsync(DataTable dataTable, string avroSchemaString)
-    {
-        var schema = Schema.Parse(avroSchemaString);
-
-        var config = new ProducerConfig
+        public KafkaAvroProducer(string bootstrapServers, string topic, string avroSchemaJson)
         {
-            BootstrapServers = _bootstrapServers,
-            Acks = Acks.All,
-            MessageTimeoutMs = 10000,
-            SecurityProtocol = SecurityProtocol.SaslSsl,
-            SaslMechanism = SaslMechanism.Plain,
-            SaslUsername = "SEU_API_KEY",
-            SaslPassword = "SEU_API_SECRET"
-        };
+            _bootstrapServers = bootstrapServers;
+            _topic = topic;
+            _schema = Schema.Parse(avroSchemaJson);
+        }
 
-        using var producer = new ProducerBuilder<string, byte[]>(config).Build();
-
-        foreach (DataRow row in dataTable.Rows)
+        public async Task SendMessagesAsync(DataTable dataTable)
         {
-            var record = CreateGenericRecordFromRow(row, dataTable.Columns, schema);
-            var avroData = SerializeRecord(record, schema);
-
-            var message = new Message<string, byte[]>
+            var config = new ProducerConfig
             {
-                Key = Guid.NewGuid().ToString(),
-                Value = avroData
+                BootstrapServers = _bootstrapServers
             };
 
-            try
+            using (var producer = new ProducerBuilder<string, byte[]>(config).Build())
             {
-                var result = await producer.ProduceAsync(_topicName, message);
-                Console.WriteLine($"Mensagem entregue: {result.TopicPartitionOffset}");
-            }
-            catch (ProduceException<string, byte[]> e)
-            {
-                Console.WriteLine($"Erro ao produzir: {e.Error.Reason}");
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    var record = CreateGenericRecord(row);
+                    var avroBytes = SerializeRecordToAvro(record);
+
+                    var message = new Message<string, byte[]>
+                    {
+                        Key = Guid.NewGuid().ToString(), // Pode ser ajustado conforme sua necessidade
+                        Value = avroBytes
+                    };
+
+                    var deliveryResult = await producer.ProduceAsync(_topic, message);
+
+                    Console.WriteLine($"Mensagem enviada para {deliveryResult.TopicPartitionOffset}");
+                }
             }
         }
-    }
 
-    private GenericRecord CreateGenericRecordFromRow(DataRow row, DataColumnCollection columns, Schema schema)
-    {
-        var record = new GenericRecord((RecordSchema)schema);
-
-        foreach (DataColumn column in columns)
+        private GenericRecord CreateGenericRecord(DataRow row)
         {
-            var columnName = column.ColumnName;
-            var value = row[column];
-            record.Add(columnName, value == DBNull.Value ? null : value);
+            var record = new GenericRecord((RecordSchema)_schema);
+
+            foreach (DataColumn column in row.Table.Columns)
+            {
+                if (row[column] == DBNull.Value)
+                {
+                    record.Add(column.ColumnName, null);
+                }
+                else
+                {
+                    record.Add(column.ColumnName, row[column]);
+                }
+            }
+
+            return record;
         }
 
-        return record;
-    }
+        private byte[] SerializeRecordToAvro(GenericRecord record)
+        {
+            using (var stream = new MemoryStream())
+            {
+                var writer = new BinaryEncoder(stream);
+                var avroWriter = new GenericWriter<GenericRecord>(_schema);
 
-    private byte[] SerializeRecord(GenericRecord record, Schema schema)
-    {
-        using var stream = new MemoryStream();
-        var encoder = new BinaryEncoder(stream);
-        var writer = new GenericWriter<GenericRecord>(schema);
-        writer.Write(record, encoder);
-        encoder.Flush();
-        return stream.ToArray();
+                avroWriter.Write(record, writer);
+                writer.Flush();
+
+                return stream.ToArray();
+            }
+        }
     }
 }
