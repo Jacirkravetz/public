@@ -1,8 +1,85 @@
-DueStatus = 
-VAR ValidDate = 'Table'[FormattedDate]
-RETURN
-IF (
-    NOT ISBLANK(ValidDate),
-    IF (ValidDate < TODAY(), "Overdue", "Upcoming"),
-    BLANK() -- or "Invalid Date" if you prefer
-)
+using System;
+using System.Data;
+using System.IO;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Confluent.Kafka;
+using Avro;
+using Avro.Generic;
+using Avro.IO;
+
+public class KafkaAvroManualProducer
+{
+    private readonly string _bootstrapServers;
+    private readonly string _topicName;
+
+    public KafkaAvroManualProducer(string bootstrapServers, string topicName)
+    {
+        _bootstrapServers = bootstrapServers;
+        _topicName = topicName;
+    }
+
+    public async Task SendMessagesAsync(DataTable dataTable, string avroSchemaString)
+    {
+        var schema = Schema.Parse(avroSchemaString);
+
+        var config = new ProducerConfig
+        {
+            BootstrapServers = _bootstrapServers,
+            Acks = Acks.All,
+            MessageTimeoutMs = 10000,
+            SecurityProtocol = SecurityProtocol.SaslSsl,
+            SaslMechanism = SaslMechanism.Plain,
+            SaslUsername = "SEU_API_KEY",
+            SaslPassword = "SEU_API_SECRET"
+        };
+
+        using var producer = new ProducerBuilder<string, byte[]>(config).Build();
+
+        foreach (DataRow row in dataTable.Rows)
+        {
+            var record = CreateGenericRecordFromRow(row, dataTable.Columns, schema);
+            var avroData = SerializeRecord(record, schema);
+
+            var message = new Message<string, byte[]>
+            {
+                Key = Guid.NewGuid().ToString(),
+                Value = avroData
+            };
+
+            try
+            {
+                var result = await producer.ProduceAsync(_topicName, message);
+                Console.WriteLine($"Mensagem entregue: {result.TopicPartitionOffset}");
+            }
+            catch (ProduceException<string, byte[]> e)
+            {
+                Console.WriteLine($"Erro ao produzir: {e.Error.Reason}");
+            }
+        }
+    }
+
+    private GenericRecord CreateGenericRecordFromRow(DataRow row, DataColumnCollection columns, Schema schema)
+    {
+        var record = new GenericRecord((RecordSchema)schema);
+
+        foreach (DataColumn column in columns)
+        {
+            var columnName = column.ColumnName;
+            var value = row[column];
+            record.Add(columnName, value == DBNull.Value ? null : value);
+        }
+
+        return record;
+    }
+
+    private byte[] SerializeRecord(GenericRecord record, Schema schema)
+    {
+        using var stream = new MemoryStream();
+        var encoder = new BinaryEncoder(stream);
+        var writer = new GenericWriter<GenericRecord>(schema);
+        writer.Write(record, encoder);
+        encoder.Flush();
+        return stream.ToArray();
+    }
+}
