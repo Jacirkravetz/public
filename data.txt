@@ -1,24 +1,26 @@
-using Microsoft.Identity.Client;
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static async Task Main()
     {
+        // Dados para autenticação
+        string tenantId = "SEU_TENANT_ID";
         string clientId = "SEU_CLIENT_ID";
-        string tenantId = "SEU_TENANT_ID"; // ou "common"
-        string authority = $"https://login.microsoftonline.com/{tenantId}";
         string username = "usuario@seudominio.com";
-        string password = "SENHA_SEGURA";
-        string[] scopes = new[] { "https://graph.microsoft.com/.default" }; // escopo com ".default" para ROPC
+        string password = "suaSenhaSegura";
+        string scope = "https://graph.microsoft.com/.default"; // ou outro escopo do recurso desejado
+        string tokenEndpoint = $"https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token";
 
-        // Configuração do proxy
-        var proxy = new WebProxy("http://seu.proxy:porta")
+        // Configurar o proxy se necessário
+        var proxy = new WebProxy("http://seu-proxy:porta")
         {
-            Credentials = new NetworkCredential("proxyUser", "proxyPassword")
+            Credentials = new NetworkCredential("usuarioProxy", "senhaProxy")
         };
 
         var httpClientHandler = new HttpClientHandler
@@ -27,45 +29,40 @@ class Program
             UseProxy = true
         };
 
-        var httpClient = new HttpClient(httpClientHandler);
-
-        // Instância do PublicClientApplication com proxy customizado
-        var app = PublicClientApplicationBuilder
-            .Create(clientId)
-            .WithAuthority(authority)
-            .WithHttpClientFactory(new ProxyHttpClientFactory(httpClient))
-            .Build();
-
-        try
+        using (var httpClient = new HttpClient(httpClientHandler))
         {
-            var securePassword = new NetworkCredential("", password).SecurePassword;
+            // Montar o corpo da requisição
+            var body = new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("client_id", clientId),
+                new KeyValuePair<string, string>("username", username),
+                new KeyValuePair<string, string>("password", password),
+                new KeyValuePair<string, string>("grant_type", "password"),
+                new KeyValuePair<string, string>("scope", scope)
+            });
 
-            var result = await app.AcquireTokenByUsernamePassword(scopes, username, securePassword)
-                                  .ExecuteAsync();
+            try
+            {
+                // Enviar requisição
+                var response = await httpClient.PostAsync(tokenEndpoint, body);
+                var content = await response.Content.ReadAsStringAsync();
 
-            Console.WriteLine("Token:");
-            Console.WriteLine(result.AccessToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("Token recebido com sucesso:");
+                    Console.WriteLine(content);
+                }
+                else
+                {
+                    Console.WriteLine($"Erro ao obter o token: {response.StatusCode}");
+                    Console.WriteLine(content);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Erro na requisição:");
+                Console.WriteLine(ex.Message);
+            }
         }
-        catch (MsalServiceException ex)
-        {
-            Console.WriteLine($"Erro ao adquirir token: {ex.ErrorCode}");
-            Console.WriteLine(ex.Message);
-        }
-    }
-}
-
-// Classe para injetar HttpClient com proxy
-public class ProxyHttpClientFactory : IMsalHttpClientFactory
-{
-    private readonly HttpClient _client;
-
-    public ProxyHttpClientFactory(HttpClient client)
-    {
-        _client = client;
-    }
-
-    public HttpClient GetHttpClient()
-    {
-        return _client;
     }
 }
