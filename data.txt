@@ -1,4 +1,60 @@
-// Implementação da fábrica de HttpClient
+using Microsoft.Identity.Client;
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        string clientId = "SEU_CLIENT_ID";
+        string tenantId = "SEU_TENANT_ID"; // ou "common"
+        string authority = $"https://login.microsoftonline.com/{tenantId}";
+        string username = "usuario@seudominio.com";
+        string password = "SENHA_SEGURA";
+        string[] scopes = new[] { "https://graph.microsoft.com/.default" }; // escopo com ".default" para ROPC
+
+        // Configuração do proxy
+        var proxy = new WebProxy("http://seu.proxy:porta")
+        {
+            Credentials = new NetworkCredential("proxyUser", "proxyPassword")
+        };
+
+        var httpClientHandler = new HttpClientHandler
+        {
+            Proxy = proxy,
+            UseProxy = true
+        };
+
+        var httpClient = new HttpClient(httpClientHandler);
+
+        // Instância do PublicClientApplication com proxy customizado
+        var app = PublicClientApplicationBuilder
+            .Create(clientId)
+            .WithAuthority(authority)
+            .WithHttpClientFactory(new ProxyHttpClientFactory(httpClient))
+            .Build();
+
+        try
+        {
+            var securePassword = new NetworkCredential("", password).SecurePassword;
+
+            var result = await app.AcquireTokenByUsernamePassword(scopes, username, securePassword)
+                                  .ExecuteAsync();
+
+            Console.WriteLine("Token:");
+            Console.WriteLine(result.AccessToken);
+        }
+        catch (MsalServiceException ex)
+        {
+            Console.WriteLine($"Erro ao adquirir token: {ex.ErrorCode}");
+            Console.WriteLine(ex.Message);
+        }
+    }
+}
+
+// Classe para injetar HttpClient com proxy
 public class ProxyHttpClientFactory : IMsalHttpClientFactory
 {
     private readonly HttpClient _client;
