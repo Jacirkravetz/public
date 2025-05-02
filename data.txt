@@ -1,68 +1,7 @@
-using System;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-class Program
-{
-    static async Task Main()
-    {
-        // Dados para autenticação
-        string tenantId = "SEU_TENANT_ID";
-        string clientId = "SEU_CLIENT_ID";
-        string username = "usuario@seudominio.com";
-        string password = "suaSenhaSegura";
-        string scope = "https://graph.microsoft.com/.default"; // ou outro escopo do recurso desejado
-        string tokenEndpoint = $"https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token";
-
-        // Configurar o proxy se necessário
-        var proxy = new WebProxy("http://seu-proxy:porta")
-        {
-            Credentials = new NetworkCredential("usuarioProxy", "senhaProxy")
-        };
-
-        var httpClientHandler = new HttpClientHandler
-        {
-            Proxy = proxy,
-            UseProxy = true
-        };
-
-        using (var httpClient = new HttpClient(httpClientHandler))
-        {
-            // Montar o corpo da requisição
-            var body = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string, string>("client_id", clientId),
-                new KeyValuePair<string, string>("username", username),
-                new KeyValuePair<string, string>("password", password),
-                new KeyValuePair<string, string>("grant_type", "password"),
-                new KeyValuePair<string, string>("scope", scope)
-            });
-
-            try
-            {
-                // Enviar requisição
-                var response = await httpClient.PostAsync(tokenEndpoint, body);
-                var content = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
-                {
-                    Console.WriteLine("Token recebido com sucesso:");
-                    Console.WriteLine(content);
-                }
-                else
-                {
-                    Console.WriteLine($"Erro ao obter o token: {response.StatusCode}");
-                    Console.WriteLine(content);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Erro na requisição:");
-                Console.WriteLine(ex.Message);
-            }
-        }
-    }
-}
+curl -X POST https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token \
+ -H "Content-Type: application/x-www-form-urlencoded" \
+ -d "client_id=<client-id>" \
+ -d "grant_type=password" \
+ -d "username=<user>@<domain>.com" \
+ -d "password=<password>" \
+ -d "scope=https://graph.microsoft.com/.default"
