@@ -41,21 +41,37 @@
 // dotnet add package QuickFix
 
 // ===============================
+// FixIntegration.Domain
+// ===============================
+
+// Interfaces/IFixAppWrapper.cs
+using QuickFix;
+using System.Data;
+using System.Threading;
+using System.Threading.Tasks;
+
+public interface IFixAppWrapper : IApplication
+{
+    void ProcessMessage(Message message, SessionID sessionID);
+}
+
+// ===============================
 // FixIntegration.ConsoleApp
 // ===============================
 
-// FixApp.cs
+// FixAppWrapper.cs
 using Microsoft.Extensions.Logging;
 using QuickFix;
 using System.Data;
+using System.Threading;
 using System.Threading.Tasks;
 
-public class FixApp : MessageCracker, IApplication
+public class FixAppWrapper : MessageCracker, IFixAppWrapper
 {
-    private readonly ILogger<FixApp> _logger;
+    private readonly ILogger<FixAppWrapper> _logger;
     private readonly FixSessionService _fixSessionService;
 
-    public FixApp(ILogger<FixApp> logger, FixSessionService fixSessionService)
+    public FixAppWrapper(ILogger<FixAppWrapper> logger, FixSessionService fixSessionService)
     {
         _logger = logger;
         _fixSessionService = fixSessionService;
@@ -64,48 +80,41 @@ public class FixApp : MessageCracker, IApplication
     public void FromApp(Message message, SessionID sessionID)
     {
         _logger.LogInformation($"[FromApp] {message}");
-        HandleMessage(message, sessionID);
+        ProcessMessage(message, sessionID);
     }
 
     public void FromAdmin(Message message, SessionID sessionID)
     {
         _logger.LogInformation($"[FromAdmin] {message}");
-        HandleMessage(message, sessionID);
+        ProcessMessage(message, sessionID);
     }
 
-    private void HandleMessage(Message message, SessionID sessionID)
+    public void ProcessMessage(Message message, SessionID sessionID)
     {
         var dataTable = new DataTable("FixMessage");
 
         foreach (var field in message.Header)
-        {
             if (!dataTable.Columns.Contains("Header_" + field.Key))
                 dataTable.Columns.Add("Header_" + field.Key, typeof(string));
-        }
+
         foreach (var field in message)
-        {
             if (!dataTable.Columns.Contains("Body_" + field.Key))
                 dataTable.Columns.Add("Body_" + field.Key, typeof(string));
-        }
+
         foreach (var field in message.Trailer)
-        {
             if (!dataTable.Columns.Contains("Trailer_" + field.Key))
                 dataTable.Columns.Add("Trailer_" + field.Key, typeof(string));
-        }
 
         var row = dataTable.NewRow();
         foreach (var field in message.Header)
-        {
             row["Header_" + field.Key] = field.Value;
-        }
+
         foreach (var field in message)
-        {
             row["Body_" + field.Key] = field.Value;
-        }
+
         foreach (var field in message.Trailer)
-        {
             row["Trailer_" + field.Key] = field.Value;
-        }
+
         dataTable.Rows.Add(row);
 
         _ = _fixSessionService.Execute(dataTable, CancellationToken.None);
@@ -128,13 +137,13 @@ using System.Threading.Tasks;
 public class FixSessionService
 {
     private readonly ILogger<FixSessionService> _logger;
-    private readonly FixApp _fixApp;
+    private readonly IFixAppWrapper _fixAppWrapper;
     private SocketInitiator? _initiator;
 
-    public FixSessionService(ILogger<FixSessionService> logger, FixApp fixApp)
+    public FixSessionService(ILogger<FixSessionService> logger, IFixAppWrapper fixAppWrapper)
     {
         _logger = logger;
-        _fixApp = fixApp;
+        _fixAppWrapper = fixAppWrapper;
     }
 
     public Task<object?> Execute(object? input, CancellationToken cancellationToken)
@@ -149,7 +158,7 @@ public class FixSessionService
             var storeFactory = new FileStoreFactory(settings);
             var logFactory = new FileLogFactory(settings);
 
-            _initiator = new SocketInitiator(_fixApp, storeFactory, settings, logFactory);
+            _initiator = new SocketInitiator((IApplication)_fixAppWrapper, storeFactory, settings, logFactory);
             _initiator.Start();
 
             _logger.LogInformation("FIX Session started.");
@@ -188,7 +197,7 @@ Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.AddSingleton<FixSessionService>();
-        services.AddSingleton<FixApp>();
+        services.AddSingleton<IFixAppWrapper, FixAppWrapper>();
         services.AddHostedService<Worker>();
     })
     .ConfigureLogging(logging =>
