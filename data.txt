@@ -1,58 +1,252 @@
+// SOLUÇÃO PROFISSIONAL FIX - QuickFIX/n
+// Estrutura: Domain, Application, Infrastructure, ConsoleApp
+// Protocolo FIX - Configurações no Banco de Dados
+
+// ---------------------------
+// Arquivo: FixIntegration.sln
+// ---------------------------
+// Comando para criar a solution:
+// dotnet new sln -n FixIntegration
+
+// Projetos:
+// dotnet new classlib -n FixIntegration.Domain
+// dotnet new classlib -n FixIntegration.Application
+// dotnet new classlib -n FixIntegration.Infrastructure
+// dotnet new console -n FixIntegration.ConsoleApp
+
+// Adicionar ao .sln:
+// dotnet sln add FixIntegration.Domain/FixIntegration.Domain.csproj
+// dotnet sln add FixIntegration.Application/FixIntegration.Application.csproj
+// dotnet sln add FixIntegration.Infrastructure/FixIntegration.Infrastructure.csproj
+// dotnet sln add FixIntegration.ConsoleApp/FixIntegration.ConsoleApp.csproj
+
+// Referências entre projetos:
+// cd FixIntegration.Application
+// dotnet add reference ../FixIntegration.Domain/FixIntegration.Domain.csproj
+
+// cd ../FixIntegration.Infrastructure
+// dotnet add reference ../FixIntegration.Domain/FixIntegration.Domain.csproj
+// dotnet add reference ../FixIntegration.Application/FixIntegration.Application.csproj
+
+// cd ../FixIntegration.ConsoleApp
+// dotnet add reference ../FixIntegration.Domain/FixIntegration.Domain.csproj
+// dotnet add reference ../FixIntegration.Application/FixIntegration.Application.csproj
+// dotnet add reference ../FixIntegration.Infrastructure/FixIntegration.Infrastructure.csproj
+
+// Dependências necessárias (na pasta ConsoleApp):
+// dotnet add package Microsoft.Extensions.Hosting
+// dotnet add package Microsoft.Extensions.DependencyInjection
+// dotnet add package Microsoft.Extensions.Logging.Console
+// dotnet add package Microsoft.Extensions.Configuration.Json
+// dotnet add package QuickFix
+
+// ===============================
+// FixIntegration.ConsoleApp
+// ===============================
+
+// FixApp.cs
+using Microsoft.Extensions.Logging;
 using QuickFix;
 using System.Data;
+using System.Threading.Tasks;
 
-namespace FixIntegration.Application.Services;
-
-public static class FixMessageDataTableService
+public class FixApp : MessageCracker, IApplication
 {
-    public static DataTable ConvertFixMessageToDataTable(Message fixMessage)
+    private readonly ILogger<FixApp> _logger;
+    private readonly FixSessionService _fixSessionService;
+
+    public FixApp(ILogger<FixApp> logger, FixSessionService fixSessionService)
     {
-        var table = new DataTable();
+        _logger = logger;
+        _fixSessionService = fixSessionService;
+    }
 
-        // Header
-        foreach (var field in fixMessage.Header)
+    public void FromApp(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation($"[FromApp] {message}");
+        HandleMessage(message, sessionID);
+    }
+
+    public void FromAdmin(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation($"[FromAdmin] {message}");
+        HandleMessage(message, sessionID);
+    }
+
+    private void HandleMessage(Message message, SessionID sessionID)
+    {
+        var dataTable = new DataTable("FixMessage");
+
+        foreach (var field in message.Header)
         {
-            string columnName = $"Header_{field.Tag}";
-            if (!table.Columns.Contains(columnName))
-                table.Columns.Add(columnName, typeof(string));
+            if (!dataTable.Columns.Contains("Header_" + field.Key))
+                dataTable.Columns.Add("Header_" + field.Key, typeof(string));
+        }
+        foreach (var field in message)
+        {
+            if (!dataTable.Columns.Contains("Body_" + field.Key))
+                dataTable.Columns.Add("Body_" + field.Key, typeof(string));
+        }
+        foreach (var field in message.Trailer)
+        {
+            if (!dataTable.Columns.Contains("Trailer_" + field.Key))
+                dataTable.Columns.Add("Trailer_" + field.Key, typeof(string));
         }
 
-        // Body
-        foreach (var field in fixMessage)
+        var row = dataTable.NewRow();
+        foreach (var field in message.Header)
         {
-            string columnName = $"Body_{field.Tag}";
-            if (!table.Columns.Contains(columnName))
-                table.Columns.Add(columnName, typeof(string));
+            row["Header_" + field.Key] = field.Value;
+        }
+        foreach (var field in message)
+        {
+            row["Body_" + field.Key] = field.Value;
+        }
+        foreach (var field in message.Trailer)
+        {
+            row["Trailer_" + field.Key] = field.Value;
+        }
+        dataTable.Rows.Add(row);
+
+        _ = _fixSessionService.Execute(dataTable, CancellationToken.None);
+    }
+
+    public void OnCreate(SessionID sessionID) => _logger.LogInformation($"Session created: {sessionID}");
+    public void OnLogon(SessionID sessionID) => _logger.LogInformation($"Logon: {sessionID}");
+    public void OnLogout(SessionID sessionID) => _logger.LogInformation($"Logout: {sessionID}");
+    public void ToAdmin(Message message, SessionID sessionID) => _logger.LogInformation($"ToAdmin: {message}");
+    public void ToApp(Message message, SessionID sessionID) => _logger.LogInformation($"ToApp: {message}");
+}
+
+// Services/FixSessionService.cs
+using Microsoft.Extensions.Logging;
+using QuickFix;
+using System.Data;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class FixSessionService
+{
+    private readonly ILogger<FixSessionService> _logger;
+    private readonly FixApp _fixApp;
+    private SocketInitiator? _initiator;
+
+    public FixSessionService(ILogger<FixSessionService> logger, FixApp fixApp)
+    {
+        _logger = logger;
+        _fixApp = fixApp;
+    }
+
+    public Task<object?> Execute(object? input, CancellationToken cancellationToken)
+    {
+        if (input is DataTable table)
+        {
+            _logger.LogInformation($"DataTable received with {table.Rows.Count} row(s). Columns: {string.Join(", ", table.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
+        }
+        else
+        {
+            var settings = new SessionSettings("fixsettings.cfg");
+            var storeFactory = new FileStoreFactory(settings);
+            var logFactory = new FileLogFactory(settings);
+
+            _initiator = new SocketInitiator(_fixApp, storeFactory, settings, logFactory);
+            _initiator.Start();
+
+            _logger.LogInformation("FIX Session started.");
         }
 
-        // Trailer
-        foreach (var field in fixMessage.Trailer)
+        return Task.Run<object?>(() =>
         {
-            string columnName = $"Trailer_{field.Tag}";
-            if (!table.Columns.Contains(columnName))
-                table.Columns.Add(columnName, typeof(string));
-        }
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                Task.Delay(1000, cancellationToken).Wait(cancellationToken);
+            }
 
-        // Adiciona uma linha com os valores
-        var row = table.NewRow();
+            return null;
+        }, cancellationToken);
+    }
 
-        foreach (var field in fixMessage.Header)
-        {
-            row[$"Header_{field.Tag}"] = field.ToString();
-        }
-
-        foreach (var field in fixMessage)
-        {
-            row[$"Body_{field.Tag}"] = field.ToString();
-        }
-
-        foreach (var field in fixMessage.Trailer)
-        {
-            row[$"Trailer_{field.Tag}"] = field.ToString();
-        }
-
-        table.Rows.Add(row);
-
-        return table;
+    public void Stop()
+    {
+        _initiator?.Stop();
+        _logger.LogInformation("FIX Session stopped.");
     }
 }
+
+// Program.cs
+using FixIntegration.ConsoleApp;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+Host.CreateDefaultBuilder(args)
+    .ConfigureAppConfiguration((context, config) =>
+    {
+        config.AddJsonFile("appsettings.json", optional: false);
+    })
+    .ConfigureServices((context, services) =>
+    {
+        services.AddSingleton<FixSessionService>();
+        services.AddSingleton<FixApp>();
+        services.AddHostedService<Worker>();
+    })
+    .ConfigureLogging(logging =>
+    {
+        logging.ClearProviders();
+        logging.AddConsole();
+    })
+    .Build()
+    .Run();
+
+// Worker.cs
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly FixSessionService _fixSessionService;
+
+    public Worker(ILogger<Worker> logger, FixSessionService fixSessionService)
+    {
+        _logger = logger;
+        _fixSessionService = fixSessionService;
+    }
+
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Iniciando serviço FIX...");
+        return _fixSessionService.Execute(null, stoppingToken);
+    }
+
+    public override Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Encerrando serviço FIX...");
+        _fixSessionService.Stop();
+        return base.StopAsync(cancellationToken);
+    }
+}
+
+// appsettings.json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Database=FixDb;User Id=sa;Password=yourStrong(!)Password;"
+  }
+}
+
+// fixsettings.cfg (Exemplo básico)
+[DEFAULT]
+ConnectionType=initiator
+ReconnectInterval=60
+SenderCompID=YOUR_SENDER
+TargetCompID=TARGET
+FileStorePath=store
+FileLogPath=log
+
+[SESSION]
+BeginString=FIX.4.2
+SocketConnectHost=127.0.0.1
+SocketConnectPort=9876
