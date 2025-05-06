@@ -5,7 +5,6 @@
 // ---------------------------
 // Arquivo: FixIntegration.sln
 // ---------------------------
-// Comando para criar a solution:
 // dotnet new sln -n FixIntegration
 
 // Projetos:
@@ -53,6 +52,10 @@ using System.Threading.Tasks;
 public interface IFixAppWrapper : IApplication
 {
     void ProcessMessage(Message message, SessionID sessionID);
+    Task RunAsync();
+    void Stop();
+    void MoveFiles();
+    void ConfigureSession(string configPath);
 }
 
 // ===============================
@@ -63,6 +66,8 @@ public interface IFixAppWrapper : IApplication
 using Microsoft.Extensions.Logging;
 using QuickFix;
 using System.Data;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -70,11 +75,61 @@ public class FixAppWrapper : MessageCracker, IFixAppWrapper
 {
     private readonly ILogger<FixAppWrapper> _logger;
     private readonly FixSessionService _fixSessionService;
+    private SocketInitiator? _initiator;
+    private SessionSettings? _settings;
+    private ILogFactory? _logFactory;
+    private IMessageStoreFactory? _storeFactory;
 
     public FixAppWrapper(ILogger<FixAppWrapper> logger, FixSessionService fixSessionService)
     {
         _logger = logger;
         _fixSessionService = fixSessionService;
+    }
+
+    public void ConfigureSession(string configPath)
+    {
+        _settings = new SessionSettings(configPath);
+        _storeFactory = new FileStoreFactory(_settings);
+        _logFactory = new FileLogFactory(_settings);
+    }
+
+    public async Task RunAsync()
+    {
+        if (_settings == null || _storeFactory == null || _logFactory == null)
+        {
+            _logger.LogError("Sessão FIX não configurada. Execute ConfigureSession primeiro.");
+            return;
+        }
+
+        _initiator = new SocketInitiator(this, _storeFactory, _settings, _logFactory);
+        _initiator.Start();
+
+        _logger.LogInformation("FIX Session started.");
+
+        await Task.Delay(-1);
+    }
+
+    public void Stop()
+    {
+        _initiator?.Stop();
+        _logger.LogInformation("FIX Session stopped.");
+    }
+
+    public void MoveFiles()
+    {
+        var sourcePath = Path.Combine(Directory.GetCurrentDirectory(), "store");
+        var targetPath = Path.Combine(Directory.GetCurrentDirectory(), "processed");
+
+        if (!Directory.Exists(targetPath))
+            Directory.CreateDirectory(targetPath);
+
+        foreach (var file in Directory.GetFiles(sourcePath))
+        {
+            var fileName = Path.GetFileName(file);
+            var destFile = Path.Combine(targetPath, fileName);
+            File.Move(file, destFile, overwrite: true);
+            _logger.LogInformation($"Moved file {fileName} to processed folder.");
+        }
     }
 
     public void FromApp(Message message, SessionID sessionID)
@@ -127,7 +182,7 @@ public class FixAppWrapper : MessageCracker, IFixAppWrapper
     public void ToApp(Message message, SessionID sessionID) => _logger.LogInformation($"ToApp: {message}");
 }
 
-// Services/FixSessionService.cs
+// FixSessionService.cs
 using Microsoft.Extensions.Logging;
 using QuickFix;
 using System.Data;
@@ -138,7 +193,6 @@ public class FixSessionService
 {
     private readonly ILogger<FixSessionService> _logger;
     private readonly IFixAppWrapper _fixAppWrapper;
-    private SocketInitiator? _initiator;
 
     public FixSessionService(ILogger<FixSessionService> logger, IFixAppWrapper fixAppWrapper)
     {
@@ -151,34 +205,19 @@ public class FixSessionService
         if (input is DataTable table)
         {
             _logger.LogInformation($"DataTable received with {table.Rows.Count} row(s). Columns: {string.Join(", ", table.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
+            return Task.FromResult<object?>(null);
         }
         else
         {
-            var settings = new SessionSettings("fixsettings.cfg");
-            var storeFactory = new FileStoreFactory(settings);
-            var logFactory = new FileLogFactory(settings);
-
-            _initiator = new SocketInitiator((IApplication)_fixAppWrapper, storeFactory, settings, logFactory);
-            _initiator.Start();
-
-            _logger.LogInformation("FIX Session started.");
+            _fixAppWrapper.ConfigureSession("fixsettings.cfg");
+            return _fixAppWrapper.RunAsync();
         }
-
-        return Task.Run<object?>(() =>
-        {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                Task.Delay(1000, cancellationToken).Wait(cancellationToken);
-            }
-
-            return null;
-        }, cancellationToken);
     }
 
     public void Stop()
     {
-        _initiator?.Stop();
-        _logger.LogInformation("FIX Session stopped.");
+        _fixAppWrapper.Stop();
+        _fixAppWrapper.MoveFiles();
     }
 }
 
@@ -246,7 +285,7 @@ public class Worker : BackgroundService
   }
 }
 
-// fixsettings.cfg (Exemplo básico)
+// fixsettings.cfg
 [DEFAULT]
 ConnectionType=initiator
 ReconnectInterval=60
