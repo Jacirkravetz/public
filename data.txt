@@ -1,9 +1,6 @@
-return Task.Run<object?>(() =>
-        {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                Task.Delay(1000, cancellationToken).Wait(cancellationToken);
-            }
-
-            return null;
-        }, cancellationToken);
+ public void OnCreate(SessionID sessionID) => _logger.LogInformation($"Session created: {sessionID}");
+    public void OnLogon(SessionID sessionID) => _logger.LogInformation($"Logon: {sessionID}");
+    public void OnLogout(SessionID sessionID) => _logger.LogInformation($"Logout: {sessionID}");
+    public void ToAdmin(Message message, SessionID sessionID) => _logger.LogInformation($"ToAdmin: {message}");
+    public void FromAdmin(Message message, SessionID sessionID) => _logger.LogInformation($"FromAdmin: {message}");
+    public void ToApp(Message message, SessionID sessionID) => _logger.LogInformation($"ToApp: {message}");
