@@ -1,10 +1,9 @@
-// Aguarda o encerramento do serviço
-        return Task.Run(() =>
+return Task.Run<object?>(() =>
         {
-            while (!stoppingToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                Task.Delay(1000, stoppingToken).Wait();
+                Task.Delay(1000, cancellationToken).Wait(cancellationToken);
             }
 
-            return Task.CompletedTask;
-        }, stoppingToken);
+            return null;
+        }, cancellationToken);
