@@ -1,187 +1,22 @@
-// SOLUÇÃO PROFISSIONAL FIX - QuickFIX/n
-// Estrutura: Domain, Application, Infrastructure, ConsoleApp
-// Protocolo FIX - Configurações no Banco de Dados
+Passo 1: Crie a interface IExecutionStepService
+Crie essa interface no projeto FixIntegration.Application (ou onde fizer sentido):
 
-// ---------------------------
-// Arquivo: FixIntegration.sln
-// ---------------------------
-// dotnet new sln -n FixIntegration
-
-// Projetos:
-// dotnet new classlib -n FixIntegration.Domain
-// dotnet new classlib -n FixIntegration.Application
-// dotnet new classlib -n FixIntegration.Infrastructure
-// dotnet new console -n FixIntegration.ConsoleApp
-
-// Adicionar ao .sln:
-// dotnet sln add FixIntegration.Domain/FixIntegration.Domain.csproj
-// dotnet sln add FixIntegration.Application/FixIntegration.Application.csproj
-// dotnet sln add FixIntegration.Infrastructure/FixIntegration.Infrastructure.csproj
-// dotnet sln add FixIntegration.ConsoleApp/FixIntegration.ConsoleApp.csproj
-
-// Referências entre projetos:
-// cd FixIntegration.Application
-// dotnet add reference ../FixIntegration.Domain/FixIntegration.Domain.csproj
-
-// cd ../FixIntegration.Infrastructure
-// dotnet add reference ../FixIntegration.Domain/FixIntegration.Domain.csproj
-// dotnet add reference ../FixIntegration.Application/FixIntegration.Application.csproj
-
-// cd ../FixIntegration.ConsoleApp
-// dotnet add reference ../FixIntegration.Domain/FixIntegration.Domain.csproj
-// dotnet add reference ../FixIntegration.Application/FixIntegration.Application.csproj
-// dotnet add reference ../FixIntegration.Infrastructure/FixIntegration.Infrastructure.csproj
-
-// Dependências necessárias (na pasta ConsoleApp):
-// dotnet add package Microsoft.Extensions.Hosting
-// dotnet add package Microsoft.Extensions.DependencyInjection
-// dotnet add package Microsoft.Extensions.Logging.Console
-// dotnet add package Microsoft.Extensions.Configuration.Json
-// dotnet add package QuickFix
-
-// ===============================
-// FixIntegration.Domain
-// ===============================
-
-// Interfaces/IFixAppWrapper.cs
-using QuickFix;
-using System.Data;
+csharp
+Copiar
+Editar
+// IExecutionStepService.cs
 using System.Threading;
 using System.Threading.Tasks;
 
-public interface IFixAppWrapper : IApplication
+public interface IExecutionStepService
 {
-    void ProcessMessage(Message message, SessionID sessionID);
-    Task RunAsync();
-    void Stop();
-    void MoveFiles();
-    void ConfigureSession(string configPath);
+    Task Init(CancellationToken cancellationToken);
+    Task<object?> Execute(object? input, CancellationToken cancellationToken);
 }
-
-// ===============================
-// FixIntegration.ConsoleApp
-// ===============================
-
-// FixAppWrapper.cs
-using Microsoft.Extensions.Logging;
-using QuickFix;
-using System.Data;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-
-public class FixAppWrapper : MessageCracker, IFixAppWrapper
-{
-    private readonly ILogger<FixAppWrapper> _logger;
-    private readonly FixSessionService _fixSessionService;
-    private SocketInitiator? _initiator;
-    private SessionSettings? _settings;
-    private ILogFactory? _logFactory;
-    private IMessageStoreFactory? _storeFactory;
-
-    public FixAppWrapper(ILogger<FixAppWrapper> logger, FixSessionService fixSessionService)
-    {
-        _logger = logger;
-        _fixSessionService = fixSessionService;
-    }
-
-    public void ConfigureSession(string configPath)
-    {
-        _settings = new SessionSettings(configPath);
-        _storeFactory = new FileStoreFactory(_settings);
-        _logFactory = new FileLogFactory(_settings);
-    }
-
-    public async Task RunAsync()
-    {
-        if (_settings == null || _storeFactory == null || _logFactory == null)
-        {
-            _logger.LogError("Sessão FIX não configurada. Execute ConfigureSession primeiro.");
-            return;
-        }
-
-        _initiator = new SocketInitiator(this, _storeFactory, _settings, _logFactory);
-        _initiator.Start();
-
-        _logger.LogInformation("FIX Session started.");
-
-        await Task.Delay(-1);
-    }
-
-    public void Stop()
-    {
-        _initiator?.Stop();
-        _logger.LogInformation("FIX Session stopped.");
-    }
-
-    public void MoveFiles()
-    {
-        var sourcePath = Path.Combine(Directory.GetCurrentDirectory(), "store");
-        var targetPath = Path.Combine(Directory.GetCurrentDirectory(), "processed");
-
-        if (!Directory.Exists(targetPath))
-            Directory.CreateDirectory(targetPath);
-
-        foreach (var file in Directory.GetFiles(sourcePath))
-        {
-            var fileName = Path.GetFileName(file);
-            var destFile = Path.Combine(targetPath, fileName);
-            File.Move(file, destFile, overwrite: true);
-            _logger.LogInformation($"Moved file {fileName} to processed folder.");
-        }
-    }
-
-    public void FromApp(Message message, SessionID sessionID)
-    {
-        _logger.LogInformation($"[FromApp] {message}");
-        ProcessMessage(message, sessionID);
-    }
-
-    public void FromAdmin(Message message, SessionID sessionID)
-    {
-        _logger.LogInformation($"[FromAdmin] {message}");
-        ProcessMessage(message, sessionID);
-    }
-
-    public void ProcessMessage(Message message, SessionID sessionID)
-    {
-        var dataTable = new DataTable("FixMessage");
-
-        foreach (var field in message.Header)
-            if (!dataTable.Columns.Contains("Header_" + field.Key))
-                dataTable.Columns.Add("Header_" + field.Key, typeof(string));
-
-        foreach (var field in message)
-            if (!dataTable.Columns.Contains("Body_" + field.Key))
-                dataTable.Columns.Add("Body_" + field.Key, typeof(string));
-
-        foreach (var field in message.Trailer)
-            if (!dataTable.Columns.Contains("Trailer_" + field.Key))
-                dataTable.Columns.Add("Trailer_" + field.Key, typeof(string));
-
-        var row = dataTable.NewRow();
-        foreach (var field in message.Header)
-            row["Header_" + field.Key] = field.Value;
-
-        foreach (var field in message)
-            row["Body_" + field.Key] = field.Value;
-
-        foreach (var field in message.Trailer)
-            row["Trailer_" + field.Key] = field.Value;
-
-        dataTable.Rows.Add(row);
-
-        _ = _fixSessionService.Execute(dataTable, CancellationToken.None);
-    }
-
-    public void OnCreate(SessionID sessionID) => _logger.LogInformation($"Session created: {sessionID}");
-    public void OnLogon(SessionID sessionID) => _logger.LogInformation($"Logon: {sessionID}");
-    public void OnLogout(SessionID sessionID) => _logger.LogInformation($"Logout: {sessionID}");
-    public void ToAdmin(Message message, SessionID sessionID) => _logger.LogInformation($"ToAdmin: {message}");
-    public void ToApp(Message message, SessionID sessionID) => _logger.LogInformation($"ToApp: {message}");
-}
-
+✅ Passo 2: Faça o FixSessionService implementar a interface
+csharp
+Copiar
+Editar
 // FixSessionService.cs
 using Microsoft.Extensions.Logging;
 using QuickFix;
@@ -189,7 +24,7 @@ using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 
-public class FixSessionService
+public class FixSessionService : IExecutionStepService
 {
     private readonly ILogger<FixSessionService> _logger;
     private readonly IFixAppWrapper _fixAppWrapper;
@@ -198,6 +33,12 @@ public class FixSessionService
     {
         _logger = logger;
         _fixAppWrapper = fixAppWrapper;
+    }
+
+    public Task Init(CancellationToken cancellationToken)
+    {
+        _fixAppWrapper.ConfigureSession("fixsettings.cfg");
+        return Task.CompletedTask;
     }
 
     public Task<object?> Execute(object? input, CancellationToken cancellationToken)
@@ -209,7 +50,6 @@ public class FixSessionService
         }
         else
         {
-            _fixAppWrapper.ConfigureSession("fixsettings.cfg");
             return _fixAppWrapper.RunAsync();
         }
     }
@@ -220,81 +60,37 @@ public class FixSessionService
         _fixAppWrapper.MoveFiles();
     }
 }
+✅ Passo 3: Ajuste a injeção de dependência no Program.cs
+Atualize o Program.cs para registrar corretamente o serviço e a interface:
 
-// Program.cs
-using FixIntegration.ConsoleApp;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+csharp
+Copiar
+Editar
+services.AddSingleton<IFixAppWrapper, FixAppWrapper>();
 
-Host.CreateDefaultBuilder(args)
-    .ConfigureAppConfiguration((context, config) =>
-    {
-        config.AddJsonFile("appsettings.json", optional: false);
-    })
-    .ConfigureServices((context, services) =>
-    {
-        services.AddSingleton<FixSessionService>();
-        services.AddSingleton<IFixAppWrapper, FixAppWrapper>();
-        services.AddHostedService<Worker>();
-    })
-    .ConfigureLogging(logging =>
-    {
-        logging.ClearProviders();
-        logging.AddConsole();
-    })
-    .Build()
-    .Run();
-
-// Worker.cs
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using System.Threading;
-using System.Threading.Tasks;
-
-public class Worker : BackgroundService
+services.AddSingleton<IExecutionStepService>(provider =>
 {
-    private readonly ILogger<Worker> _logger;
-    private readonly FixSessionService _fixSessionService;
+    var logger = provider.GetRequiredService<ILogger<FixSessionService>>();
+    var fixApp = provider.GetRequiredService<IFixAppWrapper>();
+    return new FixSessionService(logger, fixApp);
+});
+Se for necessário também injetar o FixSessionService diretamente (como no Worker), adicione:
 
-    public Worker(ILogger<Worker> logger, FixSessionService fixSessionService)
-    {
-        _logger = logger;
-        _fixSessionService = fixSessionService;
-    }
+csharp
+Copiar
+Editar
+services.AddSingleton<FixSessionService>(provider => 
+    (FixSessionService)provider.GetRequiredService<IExecutionStepService>());
+✅ Passo 4: Atualize o Worker se necessário
+Se estiver usando FixSessionService diretamente no Worker.cs, mantenha como está. Mas se preferir trabalhar com a abstração:
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        _logger.LogInformation("Iniciando serviço FIX...");
-        return _fixSessionService.Execute(null, stoppingToken);
-    }
+csharp
+Copiar
+Editar
+private readonly IExecutionStepService _executionStepService;
 
-    public override Task StopAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Encerrando serviço FIX...");
-        _fixSessionService.Stop();
-        return base.StopAsync(cancellationToken);
-    }
-}
-
-// appsettings.json
+public Worker(ILogger<Worker> logger, IExecutionStepService executionStepService)
 {
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=FixDb;User Id=sa;Password=yourStrong(!)Password;"
-  }
+    _logger = logger;
+    _executionStepService = executionStepService;
 }
-
-// fixsettings.cfg
-[DEFAULT]
-ConnectionType=initiator
-ReconnectInterval=60
-SenderCompID=YOUR_SENDER
-TargetCompID=TARGET
-FileStorePath=store
-FileLogPath=log
-
-[SESSION]
-BeginString=FIX.4.2
-SocketConnectHost=127.0.0.1
-SocketConnectPort=9876
