@@ -1,6 +1,58 @@
- public void OnCreate(SessionID sessionID) => _logger.LogInformation($"Session created: {sessionID}");
-    public void OnLogon(SessionID sessionID) => _logger.LogInformation($"Logon: {sessionID}");
-    public void OnLogout(SessionID sessionID) => _logger.LogInformation($"Logout: {sessionID}");
-    public void ToAdmin(Message message, SessionID sessionID) => _logger.LogInformation($"ToAdmin: {message}");
-    public void FromAdmin(Message message, SessionID sessionID) => _logger.LogInformation($"FromAdmin: {message}");
-    public void ToApp(Message message, SessionID sessionID) => _logger.LogInformation($"ToApp: {message}");
+using QuickFix;
+using System.Data;
+
+namespace FixIntegration.Application.Services;
+
+public static class FixMessageDataTableService
+{
+    public static DataTable ConvertFixMessageToDataTable(Message fixMessage)
+    {
+        var table = new DataTable();
+
+        // Header
+        foreach (var field in fixMessage.Header)
+        {
+            string columnName = $"Header_{field.Tag}";
+            if (!table.Columns.Contains(columnName))
+                table.Columns.Add(columnName, typeof(string));
+        }
+
+        // Body
+        foreach (var field in fixMessage)
+        {
+            string columnName = $"Body_{field.Tag}";
+            if (!table.Columns.Contains(columnName))
+                table.Columns.Add(columnName, typeof(string));
+        }
+
+        // Trailer
+        foreach (var field in fixMessage.Trailer)
+        {
+            string columnName = $"Trailer_{field.Tag}";
+            if (!table.Columns.Contains(columnName))
+                table.Columns.Add(columnName, typeof(string));
+        }
+
+        // Adiciona uma linha com os valores
+        var row = table.NewRow();
+
+        foreach (var field in fixMessage.Header)
+        {
+            row[$"Header_{field.Tag}"] = field.ToString();
+        }
+
+        foreach (var field in fixMessage)
+        {
+            row[$"Body_{field.Tag}"] = field.ToString();
+        }
+
+        foreach (var field in fixMessage.Trailer)
+        {
+            row[$"Trailer_{field.Tag}"] = field.ToString();
+        }
+
+        table.Rows.Add(row);
+
+        return table;
+    }
+}
