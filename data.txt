@@ -1,62 +1,10 @@
-using System;
-using System.Net;
-using System.Net.Http;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-class Program
-{
-    static async Task Main()
-    {
-        string tenantId = "SEU_TENANT_ID";
-        string clientId = "SEU_CLIENT_ID";
-        string username = "usuario@seudominio.com";
-        string password = "suaSenha";
-        string tokenEndpoint = $"https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token";
-
-        var proxy = new WebProxy("http://seu-proxy:porta")
+// Aguarda o encerramento do serviço
+        return Task.Run(() =>
         {
-            Credentials = new NetworkCredential("usuarioProxy", "senhaProxy")
-        };
-
-        var handler = new HttpClientHandler
-        {
-            Proxy = proxy,
-            UseProxy = true
-        };
-
-        using var httpClient = new HttpClient(handler);
-
-        var body = new FormUrlEncodedContent(new[]
-        {
-            new KeyValuePair<string, string>("client_id", clientId),
-            new KeyValuePair<string, string>("username", username),
-            new KeyValuePair<string, string>("password", password),
-            new KeyValuePair<string, string>("grant_type", "password"),
-            new KeyValuePair<string, string>("scope", "openid profile offline_access https://graph.microsoft.com/.default"),
-            new KeyValuePair<string, string>("client_info", "1")
-        });
-
-        try
-        {
-            var response = await httpClient.PostAsync(tokenEndpoint, body);
-            var content = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                Console.WriteLine("Token recebido:");
-                Console.WriteLine(content);
+                Task.Delay(1000, stoppingToken).Wait();
             }
-            else
-            {
-                Console.WriteLine($"Erro ao obter o token: {response.StatusCode}");
-                Console.WriteLine(content);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Erro de conexão:");
-            Console.WriteLine(ex.Message);
-        }
-    }
-}
+
+            return Task.CompletedTask;
+        }, stoppingToken);
