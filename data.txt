@@ -1,1 +1,33 @@
-public void OnMessage(TradeCaptureReportAck message, SessionID sessionID)
+using QuickFix;
+using System.Data;
+using System.Linq;
+
+public class FixMessageConverter
+{
+    public DataTable ConvertToDataTable(Message message)
+    {
+        var dataTable = new DataTable();
+        var row = dataTable.NewRow();
+
+        void AddFields(FieldMap fieldMap, string section)
+        {
+            foreach (var field in fieldMap)
+            {
+                string columnName = $"{section}_{field.Tag}";
+
+                if (!dataTable.Columns.Contains(columnName))
+                    dataTable.Columns.Add(columnName, typeof(string));
+
+                row[columnName] = field.Obj.ToString();
+            }
+        }
+
+        AddFields(message.Header, "Header");
+        AddFields(message, "Body");
+        AddFields(message.Trailer, "Trailer");
+
+        dataTable.Rows.Add(row);
+
+        return dataTable;
+    }
+}
