@@ -1,18 +1,17 @@
-using System.Net;
-using System.Text;
-using System.Xml.Serialization;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
-using Newtonsoft.Json;
 using Confluent.Kafka;
 using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
+using Newtonsoft.Json;
+using System;
+using System.Net;
+using System.Xml.Serialization;
+using YamlDotNet.Serialization;
 
-public static class KafkaProducerFactory
+public static class KafkaConsumerFactory
 {
-    public static IProducer<TKey, TValue> CreateProducer<TKey, TValue>(
+    public static IConsumer<TKey, TValue> CreateConsumer<TKey, TValue>(
         SerializationFormat format,
-        ProducerConfig producerConfig,
+        ConsumerConfig consumerConfig,
         string? schemaRegistryUrl = null,
         WebProxy? proxy = null)
     {
@@ -32,40 +31,46 @@ public static class KafkaProducerFactory
             schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryConfig);
         }
 
-        var builder = new ProducerBuilder<TKey, TValue>(producerConfig);
-
-        builder.SetKeySerializer(Serializers.Utf8);
-
         switch (format)
         {
             case SerializationFormat.Avro:
-                builder.SetValueSerializer(new AvroSerializer<TValue>(schemaRegistryClient!));
-                break;
+                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
+                    .SetKeyDeserializer(Deserializers.Utf8)
+                    .SetValueDeserializer(new AvroDeserializer<TValue>(schemaRegistryClient!))
+                    .Build();
 
             case SerializationFormat.Protobuf:
-                builder.SetValueSerializer(new ProtobufSerializer<TValue>(schemaRegistryClient!));
-                break;
+                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
+                    .SetKeyDeserializer(Deserializers.Utf8)
+                    .SetValueDeserializer(new ProtobufDeserializer<TValue>(schemaRegistryClient!))
+                    .Build();
 
             case SerializationFormat.JsonSchema:
-                builder.SetValueSerializer(new JsonSerializer<TValue>(schemaRegistryClient!));
-                break;
+                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
+                    .SetKeyDeserializer(Deserializers.Utf8)
+                    .SetValueDeserializer(new JsonDeserializer<TValue>(schemaRegistryClient!))
+                    .Build();
 
             case SerializationFormat.JsonPlain:
-                builder.SetValueSerializer(new JsonPlainSerializer<TValue>());
-                break;
+                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
+                    .SetKeyDeserializer(Deserializers.Utf8)
+                    .SetValueDeserializer(new JsonPlainDeserializer<TValue>())
+                    .Build();
 
             case SerializationFormat.Xml:
-                builder.SetValueSerializer(new XmlSerializerCustom<TValue>());
-                break;
+                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
+                    .SetKeyDeserializer(Deserializers.Utf8)
+                    .SetValueDeserializer(new XmlDeserializer<TValue>())
+                    .Build();
 
             case SerializationFormat.Yaml:
-                builder.SetValueSerializer(new YamlSerializer<TValue>());
-                break;
+                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
+                    .SetKeyDeserializer(Deserializers.Utf8)
+                    .SetValueDeserializer(new YamlDeserializer<TValue>())
+                    .Build();
 
             default:
                 throw new NotSupportedException($"Unsupported format: {format}");
         }
-
-        return builder.Build();
     }
 }
