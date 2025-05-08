@@ -1,12 +1,9 @@
 using Confluent.Kafka;
 using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
-using Google.Protobuf;
-using System.Text;
-using YamlDotNet.Serialization;
+using System.Text.Json;
 using System.Xml.Serialization;
 using System.IO;
-using System;
 
 public static class KafkaMessageBuilder
 {
@@ -31,23 +28,12 @@ public static class KafkaMessageBuilder
                 throw new InvalidOperationException("For Avro, value must be of type GenericRecord.");
 
             case SerializationFormat.Json:
-                var jsonPayload = System.Text.Json.JsonSerializer.Serialize(value);
+                var jsonPayload = JsonSerializer.Serialize(value);
                 return new Message<string, object>
                 {
                     Key = key,
                     Value = jsonPayload
                 };
-
-            case SerializationFormat.Protobuf:
-                if (value is IMessage protoMessage)
-                {
-                    return new Message<string, object>
-                    {
-                        Key = key,
-                        Value = protoMessage
-                    };
-                }
-                throw new InvalidOperationException("For Protobuf, value must implement IMessage.");
 
             case SerializationFormat.Xml:
                 var xmlSerializer = new XmlSerializer(value.GetType());
@@ -60,15 +46,6 @@ public static class KafkaMessageBuilder
                         Value = sw.ToString()
                     };
                 }
-
-            case SerializationFormat.Yaml:
-                var serializer = new Serializer();
-                string yaml = serializer.Serialize(value);
-                return new Message<string, object>
-                {
-                    Key = key,
-                    Value = yaml
-                };
 
             default:
                 throw new NotSupportedException($"Unsupported format: {format}");
