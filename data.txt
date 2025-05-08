@@ -1,164 +1,124 @@
-✅ 2. Custom Serializers for XML and YAML
-You must define serializers manually for formats not supported natively (e.g., XML, YAML). These serialize your objects to strings using a chosen library, then encode them to byte arrays.
+laro! Abaixo está o método GetSerializer<T> completo e funcional em C#, suportando os seguintes formatos:
 
-XML Serializer:
+✅ Avro (com Schema Registry)
+
+✅ Protobuf (com Schema Registry)
+
+✅ Json Schema (com Schema Registry)
+
+✅ Plain JSON (sem Schema Registry)
+
+✅ XML (sem Schema Registry)
+
+✅ YAML (sem Schema Registry)
+
+✅ Enum SerializationFormat
+csharp
+Copiar
+Editar
+public enum SerializationFormat
+{
+    Avro,
+    Protobuf,
+    JsonSchema,
+    JsonPlain,
+    Xml,
+    Yaml
+}
+✅ Serializers Customizados (Plain JSON, XML, YAML)
 csharp
 Copiar
 Editar
 using System.Text;
 using System.Xml.Serialization;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 using Confluent.Kafka;
+using Newtonsoft.Json;
 
-public class XmlSerializer<T> : ISerializer<T>
+public class JsonPlainSerializer<T> : ISerializer<T>
+{
+    public byte[] Serialize(T data, SerializationContext context)
+    {
+        return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+    }
+}
+
+public class XmlSerializerCustom<T> : ISerializer<T>
 {
     public byte[] Serialize(T data, SerializationContext context)
     {
         if (data == null) return null!;
-
-        using var stringWriter = new StringWriter();
-        var serializer = new XmlSerializer(typeof(T));
-        serializer.Serialize(stringWriter, data);
-        return Encoding.UTF8.GetBytes(stringWriter.ToString());
+        var xmlSerializer = new XmlSerializer(typeof(T));
+        using var stream = new MemoryStream();
+        xmlSerializer.Serialize(stream, data);
+        return stream.ToArray();
     }
 }
-YAML Serializer (using YamlDotNet):
-csharp
-Copiar
-Editar
-using System.Text;
-using YamlDotNet.Serialization;
-using Confluent.Kafka;
 
 public class YamlSerializer<T> : ISerializer<T>
 {
+    private readonly ISerializer _serializer;
+
+    public YamlSerializer()
+    {
+        _serializer = new SerializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .Build();
+    }
+
     public byte[] Serialize(T data, SerializationContext context)
     {
         if (data == null) return null!;
-
-        var serializer = new SerializerBuilder().Build();
-        var yaml = serializer.Serialize(data);
+        var yaml = _serializer.Serialize(data);
         return Encoding.UTF8.GetBytes(yaml);
     }
 }
-Note: Add the NuGet package YamlDotNet for YAML support.
-
-✅ 3. Serializer Factory
+✅ Método GetSerializer<T>
 csharp
 Copiar
 Editar
 using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
-using Confluent.Kafka;
-using Avro.Generic;
-using Google.Protobuf;
-using System;
 
 public static class SerializerFactory
 {
-    public static void ConfigureSerializers<TKey, TValue>(
-        ProducerBuilder<TKey, TValue> builder,
-        ISchemaRegistryClient? schemaRegistryClient,
-        SerializationFormat keyFormat,
-        SerializationFormat valueFormat)
-    {
-        builder.SetKeySerializer(GetSerializer<TKey>(keyFormat, schemaRegistryClient));
-        builder.SetValueSerializer(GetSerializer<TValue>(valueFormat, schemaRegistryClient));
-    }
-
-    private static ISerializer<T> GetSerializer<T>(
+    public static ISerializer<T> GetSerializer<T>(
         SerializationFormat format,
-        ISchemaRegistryClient? schemaRegistryClient)
+        ISchemaRegistryClient? schemaRegistryClient = null)
     {
         return format switch
         {
-            SerializationFormat.Avro => typeof(T) == typeof(GenericRecord)
-                ? (ISerializer<T>)new AvroSerializer<GenericRecord>(schemaRegistryClient!)
-                : throw new NotSupportedException("Avro requires GenericRecord."),
+            SerializationFormat.Avro => schemaRegistryClient != null
+                ? new AvroSerializer<T>(schemaRegistryClient)
+                : throw new ArgumentNullException(nameof(schemaRegistryClient), "SchemaRegistryClient is required for Avro."),
 
-            SerializationFormat.Json => new JsonSerializer<T>(schemaRegistryClient!),
+            SerializationFormat.Protobuf => schemaRegistryClient != null
+                ? new ProtobufSerializer<T>(schemaRegistryClient)
+                : throw new ArgumentNullException(nameof(schemaRegistryClient), "SchemaRegistryClient is required for Protobuf."),
 
-            SerializationFormat.Protobuf => typeof(T).IsSubclassOf(typeof(IMessage))
-                ? (ISerializer<T>)new ProtobufSerializer<IMessage>(schemaRegistryClient!)
-                : throw new NotSupportedException("Protobuf requires a type derived from IMessage."),
+            SerializationFormat.JsonSchema => schemaRegistryClient != null
+                ? new JsonSerializer<T>(schemaRegistryClient)
+                : throw new ArgumentNullException(nameof(schemaRegistryClient), "SchemaRegistryClient is required for JSON Schema."),
 
-            SerializationFormat.Utf8 => (ISerializer<T>)Serializers.Utf8,
+            SerializationFormat.JsonPlain => new JsonPlainSerializer<T>(),
 
-            SerializationFormat.Xml => new XmlSerializer<T>(),
+            SerializationFormat.Xml => new XmlSerializerCustom<T>(),
 
             SerializationFormat.Yaml => new YamlSerializer<T>(),
 
-            _ => throw new NotSupportedException($"Unsupported serialization format: {format}")
+            _ => throw new NotSupportedException($"Format {format} is not supported.")
         };
     }
 }
-✅ 4. KafkaProducerFactory with WebProxy support
-csharp
+📦 Pacotes NuGet necessários:
+bash
 Copiar
 Editar
-using System;
-using System.Net;
-using Confluent.Kafka;
-using Confluent.SchemaRegistry;
-using Avro.Generic;
-
-public static class KafkaProducerFactory
-{
-    public static IProducer<TKey, TValue> CreateProducer<TKey, TValue>(
-        ProducerConfig producerConfig,
-        SchemaRegistryConfig schemaRegistryConfig,
-        SerializationFormat keyFormat,
-        SerializationFormat valueFormat,
-        WebProxy? proxy = null)
-    {
-        ValidateSchemaRegistry(schemaRegistryConfig, proxy);
-
-        var schemaRegistryClient = proxy != null
-            ? new CachedSchemaRegistryClient(schemaRegistryConfig, proxy)
-            : new CachedSchemaRegistryClient(schemaRegistryConfig);
-
-        var builder = new ProducerBuilder<TKey, TValue>(producerConfig);
-
-        SerializerFactory.ConfigureSerializers(builder, schemaRegistryClient, keyFormat, valueFormat);
-
-        return builder.Build();
-    }
-
-    private static void ValidateSchemaRegistry(SchemaRegistryConfig config, WebProxy? proxy)
-    {
-        if (string.IsNullOrWhiteSpace(config.Url))
-            throw new InvalidOperationException("Schema Registry URL is not configured.");
-
-        if (proxy != null)
-            Console.WriteLine($"Using Schema Registry with WebProxy: {proxy.Address}");
-        else
-            Console.WriteLine("Using Schema Registry without proxy.");
-    }
-}
-✅ 5. Example Usage
-csharp
-Copiar
-Editar
-var producerConfig = new ProducerConfig
-{
-    BootstrapServers = "localhost:9092"
-};
-
-var schemaRegistryConfig = new SchemaRegistryConfig
-{
-    Url = "https://my-schema-registry:8081"
-};
-
-var proxy = new WebProxy("http://my-proxy:3128")
-{
-    Credentials = new NetworkCredential("user", "password")
-};
-
-var producer = KafkaProducerFactory.CreateProducer<string, MyCustomModel>(
-    producerConfig,
-    schemaRegistryConfig,
-    SerializationFormat.Utf8,  // Key serializer
-    SerializationFormat.Yaml,  // Value serializer
-    proxy);
-This setup allows you to dynamically select and use different serialization strategies, including Avro, JSON, Protobuf, XML, YAML, or plain UTF8.
-
-Would you like me to generate the Consumer version with dynamic deserialization as well?
+dotnet add package Confluent.Kafka
+dotnet add package Confluent.SchemaRegistry
+dotnet add package Confluent.SchemaRegistry.Serdes.Avro
+dotnet add package Confluent.SchemaRegistry.Serdes.Protobuf
+dotnet add package Confluent.SchemaRegistry.Serdes.Json
+dotnet add package YamlDotNet
+dotnet add package Newtonsoft.Json
