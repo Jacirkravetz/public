@@ -1,76 +1,35 @@
-using Confluent.Kafka;
-using Confluent.SchemaRegistry;
-using Confluent.SchemaRegistry.Serdes;
-using Newtonsoft.Json;
-using System;
-using System.Net;
-using System.Xml.Serialization;
-using YamlDotNet.Serialization;
-
-public static class KafkaConsumerFactory
+public class JsonPlainDeserializer<T> : IDeserializer<T>
 {
-    public static IConsumer<TKey, TValue> CreateConsumer<TKey, TValue>(
-        SerializationFormat format,
-        ConsumerConfig consumerConfig,
-        string? schemaRegistryUrl = null,
-        WebProxy? proxy = null)
+    public T Deserialize(ReadOnlyMemory<byte> data, bool isNull, SerializationContext context)
     {
-        var schemaRegistryConfig = new SchemaRegistryConfig();
+        if (isNull) return default!;
+        var jsonString = Encoding.UTF8.GetString(data.Span);
+        return JsonConvert.DeserializeObject<T>(jsonString)!;
+    }
+}
 
-        if (!string.IsNullOrEmpty(schemaRegistryUrl))
-        {
-            schemaRegistryConfig.Url = schemaRegistryUrl;
+public class XmlDeserializer<T> : IDeserializer<T>
+{
+    private readonly XmlSerializer _serializer = new XmlSerializer(typeof(T));
 
-            if (proxy != null)
-                schemaRegistryConfig.Proxy = proxy;
-        }
+    public T Deserialize(ReadOnlyMemory<byte> data, bool isNull, SerializationContext context)
+    {
+        if (isNull) return default!;
+        using var stream = new MemoryStream(data.Span);
+        return (T)_serializer.Deserialize(stream)!;
+    }
+}
 
-        ISchemaRegistryClient? schemaRegistryClient = null;
-        if (format is SerializationFormat.Avro or SerializationFormat.Protobuf or SerializationFormat.JsonSchema)
-        {
-            schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryConfig);
-        }
+public class YamlDeserializer<T> : IDeserializer<T>
+{
+    private readonly IDeserializer<T> _deserializer = new DeserializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .Build();
 
-        switch (format)
-        {
-            case SerializationFormat.Avro:
-                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
-                    .SetKeyDeserializer(Deserializers.Utf8)
-                    .SetValueDeserializer(new AvroDeserializer<TValue>(schemaRegistryClient!))
-                    .Build();
-
-            case SerializationFormat.Protobuf:
-                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
-                    .SetKeyDeserializer(Deserializers.Utf8)
-                    .SetValueDeserializer(new ProtobufDeserializer<TValue>(schemaRegistryClient!))
-                    .Build();
-
-            case SerializationFormat.JsonSchema:
-                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
-                    .SetKeyDeserializer(Deserializers.Utf8)
-                    .SetValueDeserializer(new JsonDeserializer<TValue>(schemaRegistryClient!))
-                    .Build();
-
-            case SerializationFormat.JsonPlain:
-                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
-                    .SetKeyDeserializer(Deserializers.Utf8)
-                    .SetValueDeserializer(new JsonPlainDeserializer<TValue>())
-                    .Build();
-
-            case SerializationFormat.Xml:
-                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
-                    .SetKeyDeserializer(Deserializers.Utf8)
-                    .SetValueDeserializer(new XmlDeserializer<TValue>())
-                    .Build();
-
-            case SerializationFormat.Yaml:
-                return new ConsumerBuilder<TKey, TValue>(consumerConfig)
-                    .SetKeyDeserializer(Deserializers.Utf8)
-                    .SetValueDeserializer(new YamlDeserializer<TValue>())
-                    .Build();
-
-            default:
-                throw new NotSupportedException($"Unsupported format: {format}");
-        }
+    public T Deserialize(ReadOnlyMemory<byte> data, bool isNull, SerializationContext context)
+    {
+        if (isNull) return default!;
+        var yamlString = Encoding.UTF8.GetString(data.Span);
+        return _deserializer.Deserialize<T>(yamlString);
     }
 }
