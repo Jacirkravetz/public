@@ -1,35 +1,77 @@
-public class JsonPlainDeserializer<T> : IDeserializer<T>
+using Confluent.Kafka;
+using Confluent.SchemaRegistry;
+using Confluent.SchemaRegistry.Serdes;
+using Google.Protobuf;
+using System.Text;
+using YamlDotNet.Serialization;
+using System.Xml.Serialization;
+using System.IO;
+using System;
+
+public static class KafkaMessageBuilder
 {
-    public T Deserialize(ReadOnlyMemory<byte> data, bool isNull, SerializationContext context)
+    public static Message<string, object> BuildKafkaMessage(
+        string key,
+        object value,
+        SerializationFormat format,
+        ISchemaRegistryClient? schemaRegistryClient = null,
+        string? schemaString = null)
     {
-        if (isNull) return default!;
-        var jsonString = Encoding.UTF8.GetString(data.Span);
-        return JsonConvert.DeserializeObject<T>(jsonString)!;
-    }
-}
+        switch (format)
+        {
+            case SerializationFormat.Avro:
+                if (value is GenericRecord genericRecord)
+                {
+                    return new Message<string, object>
+                    {
+                        Key = key,
+                        Value = genericRecord
+                    };
+                }
+                throw new InvalidOperationException("For Avro, value must be of type GenericRecord.");
 
-public class XmlDeserializer<T> : IDeserializer<T>
-{
-    private readonly XmlSerializer _serializer = new XmlSerializer(typeof(T));
+            case SerializationFormat.Json:
+                var jsonPayload = System.Text.Json.JsonSerializer.Serialize(value);
+                return new Message<string, object>
+                {
+                    Key = key,
+                    Value = jsonPayload
+                };
 
-    public T Deserialize(ReadOnlyMemory<byte> data, bool isNull, SerializationContext context)
-    {
-        if (isNull) return default!;
-        using var stream = new MemoryStream(data.Span);
-        return (T)_serializer.Deserialize(stream)!;
-    }
-}
+            case SerializationFormat.Protobuf:
+                if (value is IMessage protoMessage)
+                {
+                    return new Message<string, object>
+                    {
+                        Key = key,
+                        Value = protoMessage
+                    };
+                }
+                throw new InvalidOperationException("For Protobuf, value must implement IMessage.");
 
-public class YamlDeserializer<T> : IDeserializer<T>
-{
-    private readonly IDeserializer<T> _deserializer = new DeserializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .Build();
+            case SerializationFormat.Xml:
+                var xmlSerializer = new XmlSerializer(value.GetType());
+                using (var sw = new StringWriter())
+                {
+                    xmlSerializer.Serialize(sw, value);
+                    return new Message<string, object>
+                    {
+                        Key = key,
+                        Value = sw.ToString()
+                    };
+                }
 
-    public T Deserialize(ReadOnlyMemory<byte> data, bool isNull, SerializationContext context)
-    {
-        if (isNull) return default!;
-        var yamlString = Encoding.UTF8.GetString(data.Span);
-        return _deserializer.Deserialize<T>(yamlString);
+            case SerializationFormat.Yaml:
+                var serializer = new Serializer();
+                string yaml = serializer.Serialize(value);
+                return new Message<string, object>
+                {
+                    Key = key,
+                    Value = yaml
+                };
+
+            default:
+                throw new NotSupportedException($"Unsupported format: {format}");
+        }
     }
 }
