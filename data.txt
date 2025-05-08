@@ -1,124 +1,71 @@
-laro! Abaixo está o método GetSerializer<T> completo e funcional em C#, suportando os seguintes formatos:
-
-✅ Avro (com Schema Registry)
-
-✅ Protobuf (com Schema Registry)
-
-✅ Json Schema (com Schema Registry)
-
-✅ Plain JSON (sem Schema Registry)
-
-✅ XML (sem Schema Registry)
-
-✅ YAML (sem Schema Registry)
-
-✅ Enum SerializationFormat
-csharp
-Copiar
-Editar
-public enum SerializationFormat
-{
-    Avro,
-    Protobuf,
-    JsonSchema,
-    JsonPlain,
-    Xml,
-    Yaml
-}
-✅ Serializers Customizados (Plain JSON, XML, YAML)
-csharp
-Copiar
-Editar
+using System.Net;
 using System.Text;
 using System.Xml.Serialization;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-using Confluent.Kafka;
 using Newtonsoft.Json;
-
-public class JsonPlainSerializer<T> : ISerializer<T>
-{
-    public byte[] Serialize(T data, SerializationContext context)
-    {
-        return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
-    }
-}
-
-public class XmlSerializerCustom<T> : ISerializer<T>
-{
-    public byte[] Serialize(T data, SerializationContext context)
-    {
-        if (data == null) return null!;
-        var xmlSerializer = new XmlSerializer(typeof(T));
-        using var stream = new MemoryStream();
-        xmlSerializer.Serialize(stream, data);
-        return stream.ToArray();
-    }
-}
-
-public class YamlSerializer<T> : ISerializer<T>
-{
-    private readonly ISerializer _serializer;
-
-    public YamlSerializer()
-    {
-        _serializer = new SerializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .Build();
-    }
-
-    public byte[] Serialize(T data, SerializationContext context)
-    {
-        if (data == null) return null!;
-        var yaml = _serializer.Serialize(data);
-        return Encoding.UTF8.GetBytes(yaml);
-    }
-}
-✅ Método GetSerializer<T>
-csharp
-Copiar
-Editar
+using Confluent.Kafka;
 using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
 
-public static class SerializerFactory
+public static class KafkaProducerFactory
 {
-    public static ISerializer<T> GetSerializer<T>(
+    public static IProducer<TKey, TValue> CreateProducer<TKey, TValue>(
         SerializationFormat format,
-        ISchemaRegistryClient? schemaRegistryClient = null)
+        ProducerConfig producerConfig,
+        string? schemaRegistryUrl = null,
+        WebProxy? proxy = null)
     {
-        return format switch
+        var schemaRegistryConfig = new SchemaRegistryConfig();
+
+        if (!string.IsNullOrEmpty(schemaRegistryUrl))
         {
-            SerializationFormat.Avro => schemaRegistryClient != null
-                ? new AvroSerializer<T>(schemaRegistryClient)
-                : throw new ArgumentNullException(nameof(schemaRegistryClient), "SchemaRegistryClient is required for Avro."),
+            schemaRegistryConfig.Url = schemaRegistryUrl;
 
-            SerializationFormat.Protobuf => schemaRegistryClient != null
-                ? new ProtobufSerializer<T>(schemaRegistryClient)
-                : throw new ArgumentNullException(nameof(schemaRegistryClient), "SchemaRegistryClient is required for Protobuf."),
+            if (proxy != null)
+                schemaRegistryConfig.Proxy = proxy;
+        }
 
-            SerializationFormat.JsonSchema => schemaRegistryClient != null
-                ? new JsonSerializer<T>(schemaRegistryClient)
-                : throw new ArgumentNullException(nameof(schemaRegistryClient), "SchemaRegistryClient is required for JSON Schema."),
+        ISchemaRegistryClient? schemaRegistryClient = null;
+        if (format is SerializationFormat.Avro or SerializationFormat.Protobuf or SerializationFormat.JsonSchema)
+        {
+            schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryConfig);
+        }
 
-            SerializationFormat.JsonPlain => new JsonPlainSerializer<T>(),
+        var builder = new ProducerBuilder<TKey, TValue>(producerConfig);
 
-            SerializationFormat.Xml => new XmlSerializerCustom<T>(),
+        builder.SetKeySerializer(Serializers.Utf8);
 
-            SerializationFormat.Yaml => new YamlSerializer<T>(),
+        switch (format)
+        {
+            case SerializationFormat.Avro:
+                builder.SetValueSerializer(new AvroSerializer<TValue>(schemaRegistryClient!));
+                break;
 
-            _ => throw new NotSupportedException($"Format {format} is not supported.")
-        };
+            case SerializationFormat.Protobuf:
+                builder.SetValueSerializer(new ProtobufSerializer<TValue>(schemaRegistryClient!));
+                break;
+
+            case SerializationFormat.JsonSchema:
+                builder.SetValueSerializer(new JsonSerializer<TValue>(schemaRegistryClient!));
+                break;
+
+            case SerializationFormat.JsonPlain:
+                builder.SetValueSerializer(new JsonPlainSerializer<TValue>());
+                break;
+
+            case SerializationFormat.Xml:
+                builder.SetValueSerializer(new XmlSerializerCustom<TValue>());
+                break;
+
+            case SerializationFormat.Yaml:
+                builder.SetValueSerializer(new YamlSerializer<TValue>());
+                break;
+
+            default:
+                throw new NotSupportedException($"Unsupported format: {format}");
+        }
+
+        return builder.Build();
     }
 }
-📦 Pacotes NuGet necessários:
-bash
-Copiar
-Editar
-dotnet add package Confluent.Kafka
-dotnet add package Confluent.SchemaRegistry
-dotnet add package Confluent.SchemaRegistry.Serdes.Avro
-dotnet add package Confluent.SchemaRegistry.Serdes.Protobuf
-dotnet add package Confluent.SchemaRegistry.Serdes.Json
-dotnet add package YamlDotNet
-dotnet add package Newtonsoft.Json
