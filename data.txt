@@ -1,33 +1,47 @@
-using QuickFix;
-using System.Data;
-using System.Linq;
+using Confluent.SchemaRegistry.Serdes;
+using Confluent.Kafka;
+using Avro.Generic;
+using Google.Protobuf;
+using System;
 
-public class FixMessageConverter
+public static class SerializerFactory
 {
-    public DataTable ConvertToDataTable(Message message)
+    public static void ConfigurarSerializers<TKey, TValue>(
+        ProducerBuilder<TKey, TValue> builder,
+        ISchemaRegistryClient? schemaRegistryClient,
+        SerializationFormat keyFormat,
+        SerializationFormat valueFormat)
     {
-        var dataTable = new DataTable();
-        var row = dataTable.NewRow();
+        // Key
+        builder.SetKeySerializer(ObterSerializer<TKey>(keyFormat, schemaRegistryClient));
 
-        void AddFields(FieldMap fieldMap, string section)
+        // Value
+        builder.SetValueSerializer(ObterSerializer<TValue>(valueFormat, schemaRegistryClient));
+    }
+
+    private static ISerializer<T> ObterSerializer<T>(
+        SerializationFormat format,
+        ISchemaRegistryClient? schemaRegistryClient)
+    {
+        return format switch
         {
-            foreach (var field in fieldMap)
-            {
-                string columnName = $"{section}_{field.Tag}";
+            SerializationFormat.Avro => typeof(T) == typeof(GenericRecord)
+                ? (ISerializer<T>)new AvroSerializer<GenericRecord>(schemaRegistryClient!)
+                : throw new NotSupportedException("Avro requer GenericRecord."),
+            
+            SerializationFormat.Json => new JsonSerializer<T>(schemaRegistryClient!),
 
-                if (!dataTable.Columns.Contains(columnName))
-                    dataTable.Columns.Add(columnName, typeof(string));
+            SerializationFormat.Protobuf => typeof(T).IsSubclassOf(typeof(IMessage))
+                ? (ISerializer<T>)new ProtobufSerializer<IMessage>(schemaRegistryClient!)
+                : throw new NotSupportedException("Protobuf requer tipos que herdam de IMessage."),
 
-                row[columnName] = field.Obj.ToString();
-            }
-        }
+            SerializationFormat.Utf8 => (ISerializer<T>)Serializers.Utf8,
 
-        AddFields(message.Header, "Header");
-        AddFields(message, "Body");
-        AddFields(message.Trailer, "Trailer");
+            SerializationFormat.Xml => throw new NotSupportedException("XML não é suportado nativamente pelo Kafka."),
 
-        dataTable.Rows.Add(row);
+            SerializationFormat.Yaml => throw new NotSupportedException("YAML não é suportado nativamente pelo Kafka."),
 
-        return dataTable;
+            _ => throw new NotSupportedException($"Formato de serialização não suportado: {format}")
+        };
     }
 }
