@@ -1,3 +1,52 @@
+✅ 2. Custom Serializers for XML and YAML
+You must define serializers manually for formats not supported natively (e.g., XML, YAML). These serialize your objects to strings using a chosen library, then encode them to byte arrays.
+
+XML Serializer:
+csharp
+Copiar
+Editar
+using System.Text;
+using System.Xml.Serialization;
+using Confluent.Kafka;
+
+public class XmlSerializer<T> : ISerializer<T>
+{
+    public byte[] Serialize(T data, SerializationContext context)
+    {
+        if (data == null) return null!;
+
+        using var stringWriter = new StringWriter();
+        var serializer = new XmlSerializer(typeof(T));
+        serializer.Serialize(stringWriter, data);
+        return Encoding.UTF8.GetBytes(stringWriter.ToString());
+    }
+}
+YAML Serializer (using YamlDotNet):
+csharp
+Copiar
+Editar
+using System.Text;
+using YamlDotNet.Serialization;
+using Confluent.Kafka;
+
+public class YamlSerializer<T> : ISerializer<T>
+{
+    public byte[] Serialize(T data, SerializationContext context)
+    {
+        if (data == null) return null!;
+
+        var serializer = new SerializerBuilder().Build();
+        var yaml = serializer.Serialize(data);
+        return Encoding.UTF8.GetBytes(yaml);
+    }
+}
+Note: Add the NuGet package YamlDotNet for YAML support.
+
+✅ 3. Serializer Factory
+csharp
+Copiar
+Editar
+using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
 using Confluent.Kafka;
 using Avro.Generic;
@@ -6,20 +55,17 @@ using System;
 
 public static class SerializerFactory
 {
-    public static void ConfigurarSerializers<TKey, TValue>(
+    public static void ConfigureSerializers<TKey, TValue>(
         ProducerBuilder<TKey, TValue> builder,
         ISchemaRegistryClient? schemaRegistryClient,
         SerializationFormat keyFormat,
         SerializationFormat valueFormat)
     {
-        // Key
-        builder.SetKeySerializer(ObterSerializer<TKey>(keyFormat, schemaRegistryClient));
-
-        // Value
-        builder.SetValueSerializer(ObterSerializer<TValue>(valueFormat, schemaRegistryClient));
+        builder.SetKeySerializer(GetSerializer<TKey>(keyFormat, schemaRegistryClient));
+        builder.SetValueSerializer(GetSerializer<TValue>(valueFormat, schemaRegistryClient));
     }
 
-    private static ISerializer<T> ObterSerializer<T>(
+    private static ISerializer<T> GetSerializer<T>(
         SerializationFormat format,
         ISchemaRegistryClient? schemaRegistryClient)
     {
@@ -27,21 +73,92 @@ public static class SerializerFactory
         {
             SerializationFormat.Avro => typeof(T) == typeof(GenericRecord)
                 ? (ISerializer<T>)new AvroSerializer<GenericRecord>(schemaRegistryClient!)
-                : throw new NotSupportedException("Avro requer GenericRecord."),
-            
+                : throw new NotSupportedException("Avro requires GenericRecord."),
+
             SerializationFormat.Json => new JsonSerializer<T>(schemaRegistryClient!),
 
             SerializationFormat.Protobuf => typeof(T).IsSubclassOf(typeof(IMessage))
                 ? (ISerializer<T>)new ProtobufSerializer<IMessage>(schemaRegistryClient!)
-                : throw new NotSupportedException("Protobuf requer tipos que herdam de IMessage."),
+                : throw new NotSupportedException("Protobuf requires a type derived from IMessage."),
 
             SerializationFormat.Utf8 => (ISerializer<T>)Serializers.Utf8,
 
-            SerializationFormat.Xml => throw new NotSupportedException("XML não é suportado nativamente pelo Kafka."),
+            SerializationFormat.Xml => new XmlSerializer<T>(),
 
-            SerializationFormat.Yaml => throw new NotSupportedException("YAML não é suportado nativamente pelo Kafka."),
+            SerializationFormat.Yaml => new YamlSerializer<T>(),
 
-            _ => throw new NotSupportedException($"Formato de serialização não suportado: {format}")
+            _ => throw new NotSupportedException($"Unsupported serialization format: {format}")
         };
     }
 }
+✅ 4. KafkaProducerFactory with WebProxy support
+csharp
+Copiar
+Editar
+using System;
+using System.Net;
+using Confluent.Kafka;
+using Confluent.SchemaRegistry;
+using Avro.Generic;
+
+public static class KafkaProducerFactory
+{
+    public static IProducer<TKey, TValue> CreateProducer<TKey, TValue>(
+        ProducerConfig producerConfig,
+        SchemaRegistryConfig schemaRegistryConfig,
+        SerializationFormat keyFormat,
+        SerializationFormat valueFormat,
+        WebProxy? proxy = null)
+    {
+        ValidateSchemaRegistry(schemaRegistryConfig, proxy);
+
+        var schemaRegistryClient = proxy != null
+            ? new CachedSchemaRegistryClient(schemaRegistryConfig, proxy)
+            : new CachedSchemaRegistryClient(schemaRegistryConfig);
+
+        var builder = new ProducerBuilder<TKey, TValue>(producerConfig);
+
+        SerializerFactory.ConfigureSerializers(builder, schemaRegistryClient, keyFormat, valueFormat);
+
+        return builder.Build();
+    }
+
+    private static void ValidateSchemaRegistry(SchemaRegistryConfig config, WebProxy? proxy)
+    {
+        if (string.IsNullOrWhiteSpace(config.Url))
+            throw new InvalidOperationException("Schema Registry URL is not configured.");
+
+        if (proxy != null)
+            Console.WriteLine($"Using Schema Registry with WebProxy: {proxy.Address}");
+        else
+            Console.WriteLine("Using Schema Registry without proxy.");
+    }
+}
+✅ 5. Example Usage
+csharp
+Copiar
+Editar
+var producerConfig = new ProducerConfig
+{
+    BootstrapServers = "localhost:9092"
+};
+
+var schemaRegistryConfig = new SchemaRegistryConfig
+{
+    Url = "https://my-schema-registry:8081"
+};
+
+var proxy = new WebProxy("http://my-proxy:3128")
+{
+    Credentials = new NetworkCredential("user", "password")
+};
+
+var producer = KafkaProducerFactory.CreateProducer<string, MyCustomModel>(
+    producerConfig,
+    schemaRegistryConfig,
+    SerializationFormat.Utf8,  // Key serializer
+    SerializationFormat.Yaml,  // Value serializer
+    proxy);
+This setup allows you to dynamically select and use different serialization strategies, including Avro, JSON, Protobuf, XML, YAML, or plain UTF8.
+
+Would you like me to generate the Consumer version with dynamic deserialization as well?
