@@ -1,54 +1,14 @@
-using Confluent.Kafka;
-using Confluent.SchemaRegistry;
-using Confluent.SchemaRegistry.Serdes;
-using System.Text.Json;
-using System.Xml.Serialization;
-using System.IO;
-
-public static class KafkaMessageBuilder
+public class StringSerializer : ISerializer<object>
 {
-    public static Message<string, object> BuildKafkaMessage(
-        string key,
-        object value,
-        SerializationFormat format,
-        ISchemaRegistryClient? schemaRegistryClient = null,
-        string? schemaString = null)
+    public byte[] Serialize(object data, SerializationContext context)
     {
-        switch (format)
-        {
-            case SerializationFormat.Avro:
-                if (value is GenericRecord genericRecord)
-                {
-                    return new Message<string, object>
-                    {
-                        Key = key,
-                        Value = genericRecord
-                    };
-                }
-                throw new InvalidOperationException("For Avro, value must be of type GenericRecord.");
-
-            case SerializationFormat.Json:
-                var jsonPayload = JsonSerializer.Serialize(value);
-                return new Message<string, object>
-                {
-                    Key = key,
-                    Value = jsonPayload
-                };
-
-            case SerializationFormat.Xml:
-                var xmlSerializer = new XmlSerializer(value.GetType());
-                using (var sw = new StringWriter())
-                {
-                    xmlSerializer.Serialize(sw, value);
-                    return new Message<string, object>
-                    {
-                        Key = key,
-                        Value = sw.ToString()
-                    };
-                }
-
-            default:
-                throw new NotSupportedException($"Unsupported format: {format}");
-        }
+        return data == null ? null : System.Text.Encoding.UTF8.GetBytes(data.ToString());
     }
 }
+
+
+
+      SchemaType.String => new ProducerBuilder<string, object>(producerConfig)
+                .SetKeySerializer(Serializers.Utf8)
+                .SetValueSerializer(new StringSerializer())
+                .Build(),
