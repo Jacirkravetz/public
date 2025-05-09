@@ -1,14 +1,13 @@
-public class StringSerializer : ISerializer<object>
+public class StringDeserializer : IDeserializer<object>
 {
-    public byte[] Serialize(object data, SerializationContext context)
+    public object Deserialize(ReadOnlySpan<byte> data, bool isNull, SerializationContext context)
     {
-        return data == null ? null : System.Text.Encoding.UTF8.GetBytes(data.ToString());
+        return isNull ? null : System.Text.Encoding.UTF8.GetString(data);
     }
 }
 
 
-
-      SchemaType.String => new ProducerBuilder<string, object>(producerConfig)
-                .SetKeySerializer(Serializers.Utf8)
-                .SetValueSerializer(new StringSerializer())
+   SchemaType.String => new ConsumerBuilder<string, object>(consumerConfig)
+                .SetKeyDeserializer(Deserializers.Utf8)
+                .SetValueDeserializer(new StringDeserializer())
                 .Build(),
