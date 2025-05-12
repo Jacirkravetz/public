@@ -1,6 +1,21 @@
-  // Act & Assert
-    var exception = await Assert.ThrowsAsync<SecurityException>(() =>
-        new XmlRecursiveExtractor().ExtractSectionsAsync(xml, "Pedido", includedSections)
-    );
+[Test]
+public async Task ExtractSectionsAsync_ShouldThrowSecurityException_WhenXmlIsNullOrEmpty()
+{
+    // Arrange
+    string xml = "";
+    var includedSections = new List<string> { "*" };
 
-    Assert.Equal("XML input cannot be null or empty.", exception.Message);
+    // Act
+    var ex = await NUnit.Framework.Assert.ThrowsAsync<SecurityException>(async () =>
+    {
+        await XmlRecursiveExtractor.ExtractSectionsAsync(xml, "Pedido", includedSections);
+    });
+
+    // Assert
+    Assert.That(ex.Message, Is.EqualTo("XML input cannot be null or empty."));
+}
+
+
+
+Assert.That(async () => await XmlRecursiveExtractor.ExtractSectionsAsync(xml, "Pedido", includedSections),
+            Throws.TypeOf<SecurityException>().With.Message.EqualTo("XML input cannot be null or empty."));
