@@ -1,6 +1,6 @@
-// Act
-    Func<Task> act = async () => await XmlRecursiveExtractor.ExtractSectionsAsync(xml, "Pedido", includedSections);
+  // Act & Assert
+    var exception = await Assert.ThrowsAsync<SecurityException>(() =>
+        new XmlRecursiveExtractor().ExtractSectionsAsync(xml, "Pedido", includedSections)
+    );
 
-    // Assert
-    var exception = await Assert.ThrowsAsync<SecurityException>(act);
     Assert.Equal("XML input cannot be null or empty.", exception.Message);
