@@ -1,13 +1,91 @@
-public class StringDeserializer : IDeserializer<object>
+public static class XmlMultiSectionExtractor
 {
-    public object Deserialize(ReadOnlySpan<byte> data, bool isNull, SerializationContext context)
+    public static DataTable ExtractSectionsToDataTable(string xml, string parentTag, List<string> sectionsToExtract, bool includeAttributes = true)
     {
-        return isNull ? null : System.Text.Encoding.UTF8.GetString(data);
+        var doc = XDocument.Parse(xml);
+        var parentElements = doc.Descendants(parentTag);
+        var dataTable = new DataTable();
+
+        var rows = new List<Dictionary<string, string>>();
+
+        foreach (var parent in parentElements)
+        {
+            var row = new Dictionary<string, string>();
+
+            foreach (var sectionTag in sectionsToExtract)
+            {
+                var section = parent.Element(sectionTag);
+                if (section != null)
+                {
+                    var sectionData = ExtractRecursive(section, sectionTag, includeAttributes);
+                    foreach (var kv in sectionData)
+                        row[kv.Key] = kv.Value;
+                }
+            }
+
+            rows.Add(row);
+        }
+
+        var allKeys = rows.SelectMany(r => r.Keys).Distinct();
+        foreach (var key in allKeys)
+            dataTable.Columns.Add(key);
+
+        foreach (var r in rows)
+        {
+            var dr = dataTable.NewRow();
+            foreach (var kv in r)
+                dr[kv.Key] = kv.Value;
+            dataTable.Rows.Add(dr);
+        }
+
+        return dataTable;
+    }
+
+    private static Dictionary<string, string> ExtractRecursive(XElement element, string prefix, bool includeAttributes)
+    {
+        var data = new Dictionary<string, string>();
+
+        if (includeAttributes)
+        {
+            foreach (var attr in element.Attributes())
+                data[$"{prefix}@{attr.Name.LocalName}"] = attr.Value;
+        }
+
+        foreach (var child in element.Elements())
+        {
+            var key = $"{prefix}_{child.Name.LocalName}";
+
+            if (child.HasElements)
+            {
+                var nested = ExtractRecursive(child, key, includeAttributes);
+                foreach (var kv in nested)
+                    data[kv.Key] = kv.Value;
+            }
+            else
+            {
+                data[key] = child.Value;
+            }
+        }
+
+        if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
+        {
+            data[prefix] = element.Value;
+        }
+
+        return data;
     }
 }
 
 
-   SchemaType.String => new ConsumerBuilder<string, object>(consumerConfig)
-                .SetKeyDeserializer(Deserializers.Utf8)
-                .SetValueDeserializer(new StringDeserializer())
-                .Build(),
+
+var xml = File.ReadAllText("nota.xml");
+
+var sections = new List<string> { "Comprador", "EnderecoEntrega" };
+
+var dt = XmlMultiSectionExtractor.ExtractSectionsToDataTable(xml, "Pedido", sections);
+
+foreach (DataRow row in dt.Rows)
+{
+    Console.WriteLine(string.Join(" | ", row.ItemArray));
+}
+
