@@ -1,7 +1,6 @@
-// Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
-        {
-            XmlRecursiveExtractor.ExtractSections(xml, "Pedido", includedSections);
-        });
+// Act
+    Func<Task> act = async () => await XmlRecursiveExtractor.ExtractSectionsAsync(xml, "Pedido", includedSections);
 
-        Assert.Equal("XML input cannot be null or empty.", exception.Message);
+    // Assert
+    var exception = await Assert.ThrowsAsync<SecurityException>(act);
+    Assert.Equal("XML input cannot be null or empty.", exception.Message);
