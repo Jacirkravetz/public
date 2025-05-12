@@ -1,91 +1,154 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Xml.Linq;
+
 public static class XmlMultiSectionExtractor
 {
-    public static DataTable ExtractSectionsToDataTable(string xml, string parentTag, List<string> sectionsToExtract, bool includeAttributes = true)
+    public static DataTable ExtractSectionsToDataTable(
+        string xmlContent,
+        string? parentTag,
+        List<string> sectionsToExtract,
+        bool includeRootAttributes = true)
     {
-        var doc = XDocument.Parse(xml);
-        var parentElements = doc.Descendants(parentTag);
-        var dataTable = new DataTable();
+        var doc = XDocument.Parse(xmlContent);
+        var root = doc.Root ?? throw new Exception("Invalid XML");
 
-        var rows = new List<Dictionary<string, string>>();
+        // Se não especificado, começa da raiz
+        var parentElements = string.IsNullOrEmpty(parentTag)
+            ? new List<XElement> { root }
+            : doc.Descendants(parentTag).ToList();
+
+        var dataTable = new DataTable();
 
         foreach (var parent in parentElements)
         {
-            var row = new Dictionary<string, string>();
+            var rowDataList = new List<Dictionary<string, string>>();
 
-            foreach (var sectionTag in sectionsToExtract)
+            // Coleta dados da raiz se desejado
+            var rootData = includeRootAttributes ? FlattenElement(root, "Root") : new Dictionary<string, string>();
+
+            // Para cada seção desejada
+            foreach (var section in sectionsToExtract)
             {
-                var section = parent.Element(sectionTag);
-                if (section != null)
+                var sectionElements = parent.Descendants(section).ToList();
+
+                if (sectionElements.Count == 0)
                 {
-                    var sectionData = ExtractRecursive(section, sectionTag, includeAttributes);
-                    foreach (var kv in sectionData)
-                        row[kv.Key] = kv.Value;
+                    // Nenhuma ocorrência, adicionar linha com dados da raiz
+                    rowDataList.Add(new Dictionary<string, string>(rootData));
+                }
+                else
+                {
+                    foreach (var element in sectionElements)
+                    {
+                        var flattened = FlattenElement(element, section);
+                        var combined = new Dictionary<string, string>(rootData);
+
+                        foreach (var kvp in flattened)
+                            combined[kvp.Key] = kvp.Value;
+
+                        rowDataList.Add(combined);
+                    }
                 }
             }
 
-            rows.Add(row);
-        }
+            // Preencher DataTable
+            foreach (var rowDict in rowDataList)
+            {
+                foreach (var col in rowDict.Keys)
+                {
+                    if (!dataTable.Columns.Contains(col))
+                        dataTable.Columns.Add(col);
+                }
 
-        var allKeys = rows.SelectMany(r => r.Keys).Distinct();
-        foreach (var key in allKeys)
-            dataTable.Columns.Add(key);
+                var row = dataTable.NewRow();
+                foreach (var kvp in rowDict)
+                    row[kvp.Key] = kvp.Value;
 
-        foreach (var r in rows)
-        {
-            var dr = dataTable.NewRow();
-            foreach (var kv in r)
-                dr[kv.Key] = kv.Value;
-            dataTable.Rows.Add(dr);
+                dataTable.Rows.Add(row);
+            }
         }
 
         return dataTable;
     }
 
-    private static Dictionary<string, string> ExtractRecursive(XElement element, string prefix, bool includeAttributes)
+    private static Dictionary<string, string> FlattenElement(XElement element, string prefix)
     {
-        var data = new Dictionary<string, string>();
+        var result = new Dictionary<string, string>();
 
-        if (includeAttributes)
+        // Adiciona atributos
+        foreach (var attr in element.Attributes())
         {
-            foreach (var attr in element.Attributes())
-                data[$"{prefix}@{attr.Name.LocalName}"] = attr.Value;
+            var key = $"{prefix}_{attr.Name.LocalName}";
+            result[key] = attr.Value;
         }
 
+        // Adiciona filhos
         foreach (var child in element.Elements())
         {
-            var key = $"{prefix}_{child.Name.LocalName}";
-
+            var childPrefix = $"{prefix}_{child.Name.LocalName}";
             if (child.HasElements)
             {
-                var nested = ExtractRecursive(child, key, includeAttributes);
-                foreach (var kv in nested)
-                    data[kv.Key] = kv.Value;
+                var nested = FlattenElement(child, childPrefix);
+                foreach (var kvp in nested)
+                    result[kvp.Key] = kvp.Value;
             }
             else
             {
-                data[key] = child.Value;
+                result[childPrefix] = child.Value;
             }
         }
 
-        if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
+        // Se for elemento texto direto (sem filhos)
+        if (!element.HasElements && !element.HasAttributes)
         {
-            data[prefix] = element.Value;
+            result[prefix] = element.Value;
         }
 
-        return data;
+        return result;
     }
 }
 
 
 
-var xml = File.ReadAllText("nota.xml");
+string xml = @"
+<NotaFiscal>
+  <DataGlobal>2025-05-08</DataGlobal>
+  <Pedido id='123'>
+    <Comprador>
+      <Nome>João</Nome>
+      <CPF>12345678900</CPF>
+    </Comprador>
+    <EnderecoEntrega>
+      <Rua>Rua A</Rua>
+      <Cidade>São Paulo</Cidade>
+    </EnderecoEntrega>
+  </Pedido>
+  <Pedido id='456'>
+    <Comprador>
+      <Nome>Maria</Nome>
+      <CPF>98765432100</CPF>
+    </Comprador>
+    <EnderecoEntrega>
+      <Rua>Rua B</Rua>
+      <Cidade>Rio de Janeiro</Cidade>
+    </EnderecoEntrega>
+  </Pedido>
+</NotaFiscal>";
 
-var sections = new List<string> { "Comprador", "EnderecoEntrega" };
+var dt = XmlMultiSectionExtractor.ExtractSectionsToDataTable(
+    xml,
+    parentTag: "Pedido",
+    sectionsToExtract: new List<string> { "Comprador", "EnderecoEntrega" }
+);
 
-var dt = XmlMultiSectionExtractor.ExtractSectionsToDataTable(xml, "Pedido", sections);
-
+// Print sample
 foreach (DataRow row in dt.Rows)
 {
-    Console.WriteLine(string.Join(" | ", row.ItemArray));
+    foreach (DataColumn col in dt.Columns)
+        Console.Write($"{col.ColumnName}: {row[col]} | ");
+    Console.WriteLine();
 }
 
