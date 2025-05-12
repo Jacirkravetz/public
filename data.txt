@@ -5,17 +5,15 @@ var scopedElements = doc.Descendants()
 
 var sectionElement = scope.Elements()
     .FirstOrDefault(e => e.Name.LocalName.Equals(section, StringComparison.OrdinalIgnoreCase));
-
 using System.Data;
 using System.Xml.Linq;
 
-public static class XmlSectionFilterExtractor
+public static class XmlRecursiveExtractor
 {
-    public static DataTable ExtractScopedSections(
+    public static DataTable ExtractSections(
         string xmlContent,
         string scopeTag,
-        List<string> includedSections,
-        bool includeRootAttributes = false)
+        List<string> includedSections)
     {
         var dataTable = new DataTable();
         var doc = XDocument.Parse(xmlContent);
@@ -25,74 +23,95 @@ public static class XmlSectionFilterExtractor
             e.Name = e.Name.LocalName;
 
         var rows = new List<Dictionary<string, string>>();
-
         var scopeElements = doc.Descendants(scopeTag);
 
         foreach (var scopeElement in scopeElements)
         {
             var row = new Dictionary<string, string>();
 
-            // Add attributes from the scope element (e.g., <Order TmInForce="0" Typ="2">)
+            // Atributos da tag raiz (ex: Order_@Tipo)
             foreach (var attr in scopeElement.Attributes())
-            {
                 row[$"{scopeTag}_@{attr.Name.LocalName}"] = attr.Value;
-            }
 
-            foreach (var sectionName in includedSections)
+            if (includedSections.Contains("*"))
             {
-                var sectionElement = scopeElement.Element(sectionName);
-                if (sectionElement != null)
+                foreach (var child in scopeElement.Elements())
                 {
-                    ProcessElement(sectionElement, sectionName, row);
+                    ProcessElementRecursive(child, $"{scopeTag}_{child.Name.LocalName}", row);
+                }
+            }
+            else
+            {
+                foreach (var section in includedSections)
+                {
+                    var sectionElements = scopeElement.Elements(section);
+                    int count = sectionElements.Count();
+                    int index = 0;
+
+                    foreach (var elem in sectionElements)
+                    {
+                        string basePath = count > 1
+                            ? $"{scopeTag}_{section}[{index}]"
+                            : $"{scopeTag}_{section}";
+
+                        ProcessElementRecursive(elem, basePath, row);
+                        index++;
+                    }
                 }
             }
 
             rows.Add(row);
         }
 
-        // Define columns based on all keys found
-        var allKeys = rows.SelectMany(r => r.Keys).Distinct();
-        foreach (var key in allKeys)
-        {
+        // Definir colunas
+        foreach (var key in rows.SelectMany(r => r.Keys).Distinct())
             dataTable.Columns.Add(key);
-        }
 
-        // Fill rows
-        foreach (var r in rows)
+        // Adicionar linhas
+        foreach (var row in rows)
         {
             var dataRow = dataTable.NewRow();
-            foreach (var key in r.Keys)
-            {
-                dataRow[key] = r[key];
-            }
+            foreach (var key in row.Keys)
+                dataRow[key] = row[key];
             dataTable.Rows.Add(dataRow);
         }
 
         return dataTable;
     }
 
-    private static void ProcessElement(XElement element, string path, Dictionary<string, string> row)
+    private static void ProcessElementRecursive(
+        XElement element,
+        string currentPath,
+        Dictionary<string, string> row)
     {
-        // Process attributes
+        // Atributos
         foreach (var attr in element.Attributes())
+            row[$"{currentPath}_@{attr.Name.LocalName}"] = attr.Value;
+
+        var grouped = element.Elements()
+            .GroupBy(e => e.Name.LocalName)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var pair in grouped)
         {
-            row[$"{path}_@{attr.Name.LocalName}"] = attr.Value;
+            var children = pair.Value;
+            for (int i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+                string path = children.Count > 1
+                    ? $"{currentPath}_{child.Name.LocalName}[{i}]"
+                    : $"{currentPath}_{child.Name.LocalName}";
+
+                if (child.HasElements || child.HasAttributes)
+                    ProcessElementRecursive(child, path, row);
+                else
+                    row[path] = child.Value;
+            }
         }
 
-        // Process child elements
-        foreach (var child in element.Elements())
-        {
-            var newPath = $"{path}_{child.Name.LocalName}";
-            if (child.HasElements)
-                ProcessElement(child, newPath, row);
-            else
-                row[newPath] = child.Value;
-        }
-
-        // If element has text and no children, add value
         if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
         {
-            row[path] = element.Value;
+            row[currentPath] = element.Value;
         }
     }
 }
