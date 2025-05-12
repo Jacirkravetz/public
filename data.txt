@@ -4,71 +4,62 @@ using System.Data;
 using System.Linq;
 using System.Xml.Linq;
 
-public static class XmlMultiSectionExtractor
+public static class XmlSectionFilterExtractor
 {
-    public static DataTable ExtractSectionsToDataTable(
+    public static DataTable ExtractScopedSections(
         string xmlContent,
-        string? parentTag,
-        List<string> sectionsToExtract,
+        string scopeTag,
+        List<string> includedSections,
         bool includeRootAttributes = true)
     {
         var doc = XDocument.Parse(xmlContent);
-        var root = doc.Root ?? throw new Exception("Invalid XML");
-
-        // Se não especificado, começa da raiz
-        var parentElements = string.IsNullOrEmpty(parentTag)
-            ? new List<XElement> { root }
-            : doc.Descendants(parentTag).ToList();
-
+        var root = doc.Root ?? throw new Exception("Invalid XML.");
         var dataTable = new DataTable();
+        var scopedElements = doc.Descendants(scopeTag).ToList();
 
-        foreach (var parent in parentElements)
+        foreach (var scope in scopedElements)
         {
-            var rowDataList = new List<Dictionary<string, string>>();
+            var rowDict = new Dictionary<string, string>();
 
-            // Coleta dados da raiz se desejado
-            var rootData = includeRootAttributes ? FlattenElement(root, "Root") : new Dictionary<string, string>();
-
-            // Para cada seção desejada
-            foreach (var section in sectionsToExtract)
+            foreach (var section in includedSections)
             {
-                var sectionElements = parent.Descendants(section).ToList();
-
-                if (sectionElements.Count == 0)
+                var sectionElement = scope.Element(section);
+                if (sectionElement != null)
                 {
-                    // Nenhuma ocorrência, adicionar linha com dados da raiz
-                    rowDataList.Add(new Dictionary<string, string>(rootData));
+                    var flattened = FlattenElement(sectionElement, $"{scopeTag}_{section}");
+                    foreach (var kvp in flattened)
+                        rowDict[kvp.Key] = kvp.Value;
                 }
-                else
+            }
+
+            // Optional: include data from scope attributes (like id)
+            foreach (var attr in scope.Attributes())
+                rowDict[$"{scopeTag}_{attr.Name.LocalName}"] = attr.Value;
+
+            // Optional: include data from root (e.g., global tags)
+            if (includeRootAttributes)
+            {
+                foreach (var element in root.Elements())
                 {
-                    foreach (var element in sectionElements)
+                    if (element.Name.LocalName != scopeTag && !element.HasElements)
                     {
-                        var flattened = FlattenElement(element, section);
-                        var combined = new Dictionary<string, string>(rootData);
-
-                        foreach (var kvp in flattened)
-                            combined[kvp.Key] = kvp.Value;
-
-                        rowDataList.Add(combined);
+                        rowDict[$"Root_{element.Name.LocalName}"] = element.Value;
                     }
                 }
             }
 
-            // Preencher DataTable
-            foreach (var rowDict in rowDataList)
+            // Create columns dynamically
+            foreach (var col in rowDict.Keys)
             {
-                foreach (var col in rowDict.Keys)
-                {
-                    if (!dataTable.Columns.Contains(col))
-                        dataTable.Columns.Add(col);
-                }
-
-                var row = dataTable.NewRow();
-                foreach (var kvp in rowDict)
-                    row[kvp.Key] = kvp.Value;
-
-                dataTable.Rows.Add(row);
+                if (!dataTable.Columns.Contains(col))
+                    dataTable.Columns.Add(col);
             }
+
+            var row = dataTable.NewRow();
+            foreach (var kvp in rowDict)
+                row[kvp.Key] = kvp.Value;
+
+            dataTable.Rows.Add(row);
         }
 
         return dataTable;
@@ -78,14 +69,9 @@ public static class XmlMultiSectionExtractor
     {
         var result = new Dictionary<string, string>();
 
-        // Adiciona atributos
         foreach (var attr in element.Attributes())
-        {
-            var key = $"{prefix}_{attr.Name.LocalName}";
-            result[key] = attr.Value;
-        }
+            result[$"{prefix}_{attr.Name.LocalName}"] = attr.Value;
 
-        // Adiciona filhos
         foreach (var child in element.Elements())
         {
             var childPrefix = $"{prefix}_{child.Name.LocalName}";
@@ -101,16 +87,12 @@ public static class XmlMultiSectionExtractor
             }
         }
 
-        // Se for elemento texto direto (sem filhos)
         if (!element.HasElements && !element.HasAttributes)
-        {
             result[prefix] = element.Value;
-        }
 
         return result;
     }
 }
-
 
 
 string xml = @"
@@ -125,6 +107,10 @@ string xml = @"
       <Rua>Rua A</Rua>
       <Cidade>São Paulo</Cidade>
     </EnderecoEntrega>
+    <Pagamento>
+      <Metodo>Cartao</Metodo>
+      <Valor>500</Valor>
+    </Pagamento>
   </Pedido>
   <Pedido id='456'>
     <Comprador>
@@ -135,19 +121,23 @@ string xml = @"
       <Rua>Rua B</Rua>
       <Cidade>Rio de Janeiro</Cidade>
     </EnderecoEntrega>
+    <Pagamento>
+      <Metodo>Pix</Metodo>
+      <Valor>300</Valor>
+    </Pagamento>
   </Pedido>
 </NotaFiscal>";
 
-var dt = XmlMultiSectionExtractor.ExtractSectionsToDataTable(
+var result = XmlSectionFilterExtractor.ExtractScopedSections(
     xml,
-    parentTag: "Pedido",
-    sectionsToExtract: new List<string> { "Comprador", "EnderecoEntrega" }
+    scopeTag: "Pedido",
+    includedSections: new List<string> { "Comprador", "EnderecoEntrega" },
+    includeRootAttributes: true
 );
 
-// Print sample
-foreach (DataRow row in dt.Rows)
+foreach (DataRow row in result.Rows)
 {
-    foreach (DataColumn col in dt.Columns)
+    foreach (DataColumn col in result.Columns)
         Console.Write($"{col.ColumnName}: {row[col]} | ");
     Console.WriteLine();
 }
