@@ -1,21 +1,41 @@
-[Test]
-public async Task ExtractSectionsAsync_ShouldThrowSecurityException_WhenXmlIsNullOrEmpty()
+using System;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Linq;
+
+public static class XmlUtils
 {
-    // Arrange
-    string xml = "";
-    var includedSections = new List<string> { "*" };
-
-    // Act
-    var ex = await NUnit.Framework.Assert.ThrowsAsync<SecurityException>(async () =>
+    /// <summary>
+    /// Reads a Stream, parses it as XML, and returns its string representation.
+    /// </summary>
+    /// <param name="stream">Input stream containing XML content.</param>
+    /// <returns>Formatted XML string.</returns>
+    public static async Task<string> ReadXmlStreamAsStringAsync(Stream stream)
     {
-        await XmlRecursiveExtractor.ExtractSectionsAsync(xml, "Pedido", includedSections);
-    });
+        if (stream == null || !stream.CanRead)
+            throw new ArgumentException("Invalid or unreadable stream.");
 
-    // Assert
-    Assert.That(ex.Message, Is.EqualTo("XML input cannot be null or empty."));
+        // Reset stream position if possible
+        if (stream.CanSeek)
+            stream.Seek(0, SeekOrigin.Begin);
+
+        using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+        var rawContent = await reader.ReadToEndAsync();
+
+        if (string.IsNullOrWhiteSpace(rawContent))
+            throw new ArgumentException("The stream does not contain any content.");
+
+        try
+        {
+            // Validate and format as XML
+            var xml = XDocument.Parse(rawContent);
+            return xml.ToString(SaveOptions.None);
+        }
+        catch (XmlException ex)
+        {
+            throw new InvalidDataException("The stream does not contain valid XML.", ex);
+        }
+    }
 }
-
-
-
-Assert.That(async () => await XmlRecursiveExtractor.ExtractSectionsAsync(xml, "Pedido", includedSections),
-            Throws.TypeOf<SecurityException>().With.Message.EqualTo("XML input cannot be null or empty."));
