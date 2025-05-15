@@ -1,83 +1,97 @@
-✅ Classe C# Refatorada com string[]
-csharp
-Copiar
-Editar
-public class FixSessionMonitorConfig
+using QuickFix;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+public class FixApp : IApplication
 {
-    public string SessionQualifier { get; set; } = "";
+    private readonly IFixConfigRepository _configRepository;
 
-    public string[] FromAppMsgTypes { get; set; } = Array.Empty<string>();
-    public string[] ToAppMsgTypes { get; set; } = Array.Empty<string>();
-    public string[] FromAdminMsgTypes { get; set; } = Array.Empty<string>();
-    public string[] ToAdminMsgTypes { get; set; } = Array.Empty<string>();
-
-    public bool EnableFromApp { get; set; } = true;
-    public bool EnableToApp { get; set; } = true;
-    public bool EnableFromAdmin { get; set; } = true;
-    public bool EnableToAdmin { get; set; } = true;
-
-    public bool IsActive { get; set; }
-
-    public bool IsEnabled(string source) => source switch
+    public FixApp(IFixConfigRepository configRepository)
     {
-        "FromApp" => EnableFromApp,
-        "ToApp" => EnableToApp,
-        "FromAdmin" => EnableFromAdmin,
-        "ToAdmin" => EnableToAdmin,
+        _configRepository = configRepository;
+    }
+
+    public void OnCreate(SessionID sessionID)
+    {
+        Console.WriteLine($"[OnCreate] Session created: {sessionID}");
+    }
+
+    public void OnLogon(SessionID sessionID)
+    {
+        Console.WriteLine($"[OnLogon] Session logged on: {sessionID}");
+    }
+
+    public void OnLogout(SessionID sessionID)
+    {
+        Console.WriteLine($"[OnLogout] Session logged out: {sessionID}");
+    }
+
+    public void FromAdmin(Message message, SessionID sessionID)
+    {
+        HandleMessage("FromAdmin", message, sessionID);
+    }
+
+    public void ToAdmin(Message message, SessionID sessionID)
+    {
+        HandleMessage("ToAdmin", message, sessionID);
+    }
+
+    public void FromApp(Message message, SessionID sessionID)
+    {
+        HandleMessage("FromApp", message, sessionID);
+    }
+
+    public void ToApp(Message message, SessionID sessionID)
+    {
+        HandleMessage("ToApp", message, sessionID);
+    }
+
+    private void HandleMessage(string source, Message message, SessionID sessionID)
+    {
+        string msgType = message.Header.GetString(Fields.Tags.MsgType);
+        string sessionQualifier = sessionID.ToString();
+
+        var config = _configRepository.GetConfigForSession(sessionQualifier);
+        if (!IsConfigActive(config)) return;
+        if (!ShouldMonitor(config, source, msgType)) return;
+
+        LogMessage(source, sessionID, msgType, message);
+    }
+
+    private bool IsConfigActive(FixSessionMonitorConfig? config)
+    {
+        return config != null && config.IsActive;
+    }
+
+    private bool ShouldMonitor(FixSessionMonitorConfig config, string source, string msgType)
+    {
+        if (!IsOverrideEnabled(config, source)) return false;
+
+        var msgTypes = GetMsgTypes(config, source);
+        return msgTypes.Contains("*") || msgTypes.Contains(msgType);
+    }
+
+    private bool IsOverrideEnabled(FixSessionMonitorConfig config, string source) => source switch
+    {
+        "FromApp" => config.EnableFromApp,
+        "ToApp" => config.EnableToApp,
+        "FromAdmin" => config.EnableFromAdmin,
+        "ToAdmin" => config.EnableToAdmin,
         _ => false
     };
 
-    public string[] GetMessageTypes(string source) => source switch
+    private string[] GetMsgTypes(FixSessionMonitorConfig config, string source) => source switch
     {
-        "FromApp" => FromAppMsgTypes,
-        "ToApp" => ToAppMsgTypes,
-        "FromAdmin" => FromAdminMsgTypes,
-        "ToAdmin" => ToAdminMsgTypes,
+        "FromApp" => config.FromAppMsgTypes,
+        "ToApp" => config.ToAppMsgTypes,
+        "FromAdmin" => config.FromAdminMsgTypes,
+        "ToAdmin" => config.ToAdminMsgTypes,
         _ => Array.Empty<string>()
     };
 
-    public bool ShouldMonitor(string source, string msgType)
+    private void LogMessage(string source, SessionID sessionID, string msgType, Message message)
     {
-        if (!IsEnabled(source))
-            return false;
-
-        var types = GetMessageTypes(source);
-        return types.Contains("*") || types.Contains(msgType);
-    }
-
-    // Método auxiliar para popular os arrays a partir de strings CSV (ex: ao ler do banco)
-    public static string[] ParseMsgTypes(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return Array.Empty<string>();
-        return raw.Trim() == "*"
-            ? new[] { "*" }
-            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Console.WriteLine($"[{source}] [{sessionID}] MsgType: {msgType}\n{message}");
     }
 }
-✅ Exemplo de uso ao carregar do banco (via Dapper, EF, ADO.NET etc.)
-Suponha que você leu as colunas como string do banco. Faça assim:
-
-csharp
-Copiar
-Editar
-var config = new FixSessionMonitorConfig
-{
-    SessionQualifier = reader["SessionQualifier"].ToString(),
-    FromAppMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["FromAppMsgTypes"]?.ToString()),
-    ToAppMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["ToAppMsgTypes"]?.ToString()),
-    FromAdminMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["FromAdminMsgTypes"]?.ToString()),
-    ToAdminMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["ToAdminMsgTypes"]?.ToString()),
-
-    EnableFromApp = Convert.ToBoolean(reader["EnableFromApp"]),
-    EnableToApp = Convert.ToBoolean(reader["EnableToApp"]),
-    EnableFromAdmin = Convert.ToBoolean(reader["EnableFromAdmin"]),
-    EnableToAdmin = Convert.ToBoolean(reader["EnableToAdmin"]),
-    IsActive = Convert.ToBoolean(reader["IsActive"])
-};
-✅ Banco de Dados: estrutura permanece a mesma
-As colunas continuam como NVARCHAR, por exemplo:
-
-sql
-Copiar
-Editar
-FromAppMsgTypes NVARCHAR(200) NULL,  -- ex: 'D,8,9' ou '*'
