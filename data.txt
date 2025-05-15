@@ -1,6 +1,83 @@
-public static string ConvertXDocumentToString(XDocument xDoc, bool indent = true)
+✅ Classe C# Refatorada com string[]
+csharp
+Copiar
+Editar
+public class FixSessionMonitorConfig
+{
+    public string SessionQualifier { get; set; } = "";
+
+    public string[] FromAppMsgTypes { get; set; } = Array.Empty<string>();
+    public string[] ToAppMsgTypes { get; set; } = Array.Empty<string>();
+    public string[] FromAdminMsgTypes { get; set; } = Array.Empty<string>();
+    public string[] ToAdminMsgTypes { get; set; } = Array.Empty<string>();
+
+    public bool EnableFromApp { get; set; } = true;
+    public bool EnableToApp { get; set; } = true;
+    public bool EnableFromAdmin { get; set; } = true;
+    public bool EnableToAdmin { get; set; } = true;
+
+    public bool IsActive { get; set; }
+
+    public bool IsEnabled(string source) => source switch
     {
-        var settings = new SaveOptions();
-        settings = indent ? SaveOptions.None : SaveOptions.DisableFormatting;
-        return xDoc.ToString(settings);
+        "FromApp" => EnableFromApp,
+        "ToApp" => EnableToApp,
+        "FromAdmin" => EnableFromAdmin,
+        "ToAdmin" => EnableToAdmin,
+        _ => false
+    };
+
+    public string[] GetMessageTypes(string source) => source switch
+    {
+        "FromApp" => FromAppMsgTypes,
+        "ToApp" => ToAppMsgTypes,
+        "FromAdmin" => FromAdminMsgTypes,
+        "ToAdmin" => ToAdminMsgTypes,
+        _ => Array.Empty<string>()
+    };
+
+    public bool ShouldMonitor(string source, string msgType)
+    {
+        if (!IsEnabled(source))
+            return false;
+
+        var types = GetMessageTypes(source);
+        return types.Contains("*") || types.Contains(msgType);
     }
+
+    // Método auxiliar para popular os arrays a partir de strings CSV (ex: ao ler do banco)
+    public static string[] ParseMsgTypes(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return Array.Empty<string>();
+        return raw.Trim() == "*"
+            ? new[] { "*" }
+            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+}
+✅ Exemplo de uso ao carregar do banco (via Dapper, EF, ADO.NET etc.)
+Suponha que você leu as colunas como string do banco. Faça assim:
+
+csharp
+Copiar
+Editar
+var config = new FixSessionMonitorConfig
+{
+    SessionQualifier = reader["SessionQualifier"].ToString(),
+    FromAppMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["FromAppMsgTypes"]?.ToString()),
+    ToAppMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["ToAppMsgTypes"]?.ToString()),
+    FromAdminMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["FromAdminMsgTypes"]?.ToString()),
+    ToAdminMsgTypes = FixSessionMonitorConfig.ParseMsgTypes(reader["ToAdminMsgTypes"]?.ToString()),
+
+    EnableFromApp = Convert.ToBoolean(reader["EnableFromApp"]),
+    EnableToApp = Convert.ToBoolean(reader["EnableToApp"]),
+    EnableFromAdmin = Convert.ToBoolean(reader["EnableFromAdmin"]),
+    EnableToAdmin = Convert.ToBoolean(reader["EnableToAdmin"]),
+    IsActive = Convert.ToBoolean(reader["IsActive"])
+};
+✅ Banco de Dados: estrutura permanece a mesma
+As colunas continuam como NVARCHAR, por exemplo:
+
+sql
+Copiar
+Editar
+FromAppMsgTypes NVARCHAR(200) NULL,  -- ex: 'D,8,9' ou '*'
