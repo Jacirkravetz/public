@@ -1,97 +1,55 @@
-using QuickFix;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+DECLARE @IdStep INT;
+DECLARE @NomeTabela NVARCHAR(100);
+DECLARE @Sql NVARCHAR(MAX);
+DECLARE @Mensagem NVARCHAR(MAX);
 
-public class FixApp : IApplication
-{
-    private readonly IFixConfigRepository _configRepository;
+-- Cursor para iterar sobre todos os Steps parametrizados
+DECLARE steps_cursor CURSOR FOR
+SELECT IdStep, NomeTabela
+FROM ParametrizacaoSteps;
 
-    public FixApp(IFixConfigRepository configRepository)
-    {
-        _configRepository = configRepository;
-    }
+-- Abrir cursor
+OPEN steps_cursor;
 
-    public void OnCreate(SessionID sessionID)
-    {
-        Console.WriteLine($"[OnCreate] Session created: {sessionID}");
-    }
+FETCH NEXT FROM steps_cursor INTO @IdStep, @NomeTabela;
 
-    public void OnLogon(SessionID sessionID)
-    {
-        Console.WriteLine($"[OnLogon] Session logged on: {sessionID}");
-    }
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    BEGIN TRY
+        -- Verifica se a tabela realmente existe
+        IF EXISTS (
+            SELECT 1
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = @NomeTabela
+                  AND TABLE_TYPE = 'BASE TABLE'
+        )
+        BEGIN
+            SET @Mensagem = '✅ [IdStep: ' + CAST(@IdStep AS NVARCHAR) + '] Tabela encontrada: ' + QUOTENAME(@NomeTabela);
+            PRINT @Mensagem;
 
-    public void OnLogout(SessionID sessionID)
-    {
-        Console.WriteLine($"[OnLogout] Session logged out: {sessionID}");
-    }
+            -- Monta a query dinâmica
+            SET @Sql = 'SELECT * FROM ' + QUOTENAME(@NomeTabela) + 
+                       ' -- IdStep: ' + CAST(@IdStep AS NVARCHAR);
 
-    public void FromAdmin(Message message, SessionID sessionID)
-    {
-        HandleMessage("FromAdmin", message, sessionID);
-    }
+            -- Executa a consulta
+            EXEC sp_executesql @Sql;
+        END
+        ELSE
+        BEGIN
+            SET @Mensagem = '⚠️ [IdStep: ' + CAST(@IdStep AS NVARCHAR) + '] Tabela NÃO encontrada: ' + ISNULL(@NomeTabela, 'NULL');
+            PRINT @Mensagem;
+        END
+    END TRY
+    BEGIN CATCH
+        SET @Mensagem = '❌ [IdStep: ' + CAST(@IdStep AS NVARCHAR) + '] Erro ao consultar tabela: ' + ISNULL(@NomeTabela, 'NULL') +
+                        CHAR(13) + 'Erro: ' + ERROR_MESSAGE();
+        PRINT @Mensagem;
+    END CATCH;
 
-    public void ToAdmin(Message message, SessionID sessionID)
-    {
-        HandleMessage("ToAdmin", message, sessionID);
-    }
+    -- Próxima linha
+    FETCH NEXT FROM steps_cursor INTO @IdStep, @NomeTabela;
+END
 
-    public void FromApp(Message message, SessionID sessionID)
-    {
-        HandleMessage("FromApp", message, sessionID);
-    }
-
-    public void ToApp(Message message, SessionID sessionID)
-    {
-        HandleMessage("ToApp", message, sessionID);
-    }
-
-    private void HandleMessage(string source, Message message, SessionID sessionID)
-    {
-        string msgType = message.Header.GetString(Fields.Tags.MsgType);
-        string sessionQualifier = sessionID.ToString();
-
-        var config = _configRepository.GetConfigForSession(sessionQualifier);
-        if (!IsConfigActive(config)) return;
-        if (!ShouldMonitor(config, source, msgType)) return;
-
-        LogMessage(source, sessionID, msgType, message);
-    }
-
-    private bool IsConfigActive(FixSessionMonitorConfig? config)
-    {
-        return config != null && config.IsActive;
-    }
-
-    private bool ShouldMonitor(FixSessionMonitorConfig config, string source, string msgType)
-    {
-        if (!IsOverrideEnabled(config, source)) return false;
-
-        var msgTypes = GetMsgTypes(config, source);
-        return msgTypes.Contains("*") || msgTypes.Contains(msgType);
-    }
-
-    private bool IsOverrideEnabled(FixSessionMonitorConfig config, string source) => source switch
-    {
-        "FromApp" => config.EnableFromApp,
-        "ToApp" => config.EnableToApp,
-        "FromAdmin" => config.EnableFromAdmin,
-        "ToAdmin" => config.EnableToAdmin,
-        _ => false
-    };
-
-    private string[] GetMsgTypes(FixSessionMonitorConfig config, string source) => source switch
-    {
-        "FromApp" => config.FromAppMsgTypes,
-        "ToApp" => config.ToAppMsgTypes,
-        "FromAdmin" => config.FromAdminMsgTypes,
-        "ToAdmin" => config.ToAdminMsgTypes,
-        _ => Array.Empty<string>()
-    };
-
-    private void LogMessage(string source, SessionID sessionID, string msgType, Message message)
-    {
-        Console.WriteLine($"[{source}] [{sessionID}] MsgType: {msgType}\n{message}");
-    }
-}
+-- Finaliza cursor
+CLOSE steps_cursor;
+DEALLOCATE steps_cursor;
