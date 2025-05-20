@@ -1,13 +1,17 @@
-DataConvertida = 
-VAR TextoData = [SuaColunaDeTexto]
-VAR Dia = VALUE(LEFT(TextoData, 2))
-VAR Mes = VALUE(MID(TextoData, 4, 2))
-VAR Ano = VALUE(RIGHT(TextoData, 4))
-
+ConvertedDate =
+VAR TextDate = [YourTextColumn]
 RETURN
-IF(
-    ISBLANK(Dia) || ISBLANK(Mes) || ISBLANK(Ano) ||
-    Dia > 31 || Mes > 12 || Ano < 1900 || YEAR(TODAY()) + 100 < Ano,
-    BLANK(),
-    DATE(Ano, Mes, Dia)
+IF (
+    LEN(TextDate) = 10
+        && MID(TextDate, 3, 1) = "/"
+        && MID(TextDate, 6, 1) = "/"
+        && ISNUMBER(VALUE(LEFT(TextDate, 2)))
+        && ISNUMBER(VALUE(MID(TextDate, 4, 2)))
+        && ISNUMBER(VALUE(RIGHT(TextDate, 4))),
+    DATE(
+        VALUE(RIGHT(TextDate, 4)),     -- Year
+        VALUE(MID(TextDate, 4, 2)),    -- Month
+        VALUE(LEFT(TextDate, 2))       -- Day
+    ),
+    BLANK()
 )
