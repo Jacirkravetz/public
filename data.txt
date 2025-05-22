@@ -1,28 +1,83 @@
-# Converte o HTML para uma string adequada ao VBA
-function Convert-HtmlToVbaSafeString {
-    param (
-        [string]$html,
-        [int]$maxLength = 1000
-    )
+# Configurations
+$smtpServer = "smtp.company.com"
+$from = "reports@company.com"
+$to = "user1@company.com;user2@company.com"
+$subject = "Dynamic Report"
+$sqlServer = "YOUR_SERVER"
+$database = "YOUR_DATABASE"
 
-    $escapedHtml = $html -replace '"', '""'
-    $escapedHtml = $escapedHtml -replace "`r?`n", ""
-    $parts = @()
-    
-    for ($i = 0; $i -lt $escapedHtml.Length; $i += $maxLength) {
-        $part = $escapedHtml.Substring($i, [Math]::Min($maxLength, $escapedHtml.Length - $i))
-        $parts += '    html = html & "' + $part + '"'
-    }
+# Create SQL connection
+$connectionString = "Server=$sqlServer;Database=$database;Integrated Security=True;"
+$connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
+$connection.Open()
 
-    return @(
-        'Dim html As String',
-        'html = ""',
-        $parts
-    ) -join "`r`n"
+# Check existing tables
+$possibleTables = "Table1", "Table2", "Table3", "Table4", "Table5"
+$existingTables = @()
+
+foreach ($table in $possibleTables) {
+    $cmd = $connection.CreateCommand()
+    $cmd.CommandText = "IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '$table') SELECT '$table' ELSE SELECT NULL"
+    $result = $cmd.ExecuteScalar()
+    if ($result) { $existingTables += $result }
 }
 
-# Gere o HTML normalmente (supondo que $html já tenha seu conteúdo)
-$vbaHtmlCode = Convert-HtmlToVbaSafeString -html $html
+# Build dynamic query
+$selectStatements = $existingTables | ForEach-Object { "SELECT Id, Name, CPF FROM $_" }
+$finalQuery = ($selectStatements -join " UNION ALL ")
 
-# Copie para a área de transferência para colar no VBA
-$vbaHtmlCode | Set-Clipboard
+# Execute query only if any table exists
+$dataTable = New-Object System.Data.DataTable
+if (![string]::IsNullOrWhiteSpace($finalQuery)) {
+    $command = $connection.CreateCommand()
+    $command.CommandText = $finalQuery
+
+    $adapter = New-Object System.Data.SqlClient.SqlDataAdapter $command
+    $adapter.Fill($dataTable) | Out-Null
+}
+
+$connection.Close()
+
+# Check current time and data availability
+$currentTime = Get-Date
+$currentHour = $currentTime.Hour
+$hasRows = $dataTable.Rows.Count -gt 0
+$isWithinSchedule = ($currentHour -ge 8 -and $currentHour -lt 21)
+
+if ($hasRows -and $isWithinSchedule) {
+    # Build HTML with results and query
+    $html = @"
+<html>
+<head>
+  <style>
+    body { font-family: Arial; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    pre.query-box { background-color: #eee; padding: 10px; border: 1px solid #ccc; font-size: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Report</h2>
+  <pre class="query-box">$finalQuery</pre>
+  <table>
+    <tr><th>ID</th><th>Name</th><th>CPF</th></tr>
+"@
+
+    foreach ($row in $dataTable.Rows) {
+        $html += "<tr><td>$($row.Id)</td><td>$($row.Name)</td><td>$($row.CPF)</td></tr>`n"
+    }
+
+    $html += @"
+  </table>
+</body>
+</html>
+"@
+
+    # Send email
+    Send-MailMessage -From $from -To $to -Subject $subject -Body $html -BodyAsHtml -SmtpServer $smtpServer
+    Write-Host "Email sent successfully."
+}
+else {
+    Write-Host "Email NOT sent. Has data: $hasRows | Within schedule: $isWithinSchedule"
+}
