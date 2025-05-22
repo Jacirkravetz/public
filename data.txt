@@ -1,1 +1,149 @@
-try Date.FromText([SuaColunaDeTexto], [Format="pt-BR"]) otherwise null
+# Configurações
+$SqlServer = "SEU_SERVIDOR"
+$Database = "SUA_BASE"
+$Tabelas = @("Tabela1", "Tabela2", "Tabela3", "Tabela4", "Tabela5")
+$EmailFrom = "seuemail@empresa.com"
+$EmailTo = "destinatario@empresa.com"
+$SmtpServer = "smtp.seudominio.com"
+$Subject = "Relatório Consolidado - $(Get-Date -Format 'dd/MM/yyyy')"
+
+# Função: Verificar se a tabela existe
+function Test-TableExists {
+    param (
+        [string]$Server,
+        [string]$Database,
+        [string]$TableName
+    )
+    $query = @"
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME = '$TableName'
+"@
+
+    $connectionString = "Server=$Server;Database=$Database;Integrated Security=True;"
+    $connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
+    $command = $connection.CreateCommand()
+    $command.CommandText = $query
+    $connection.Open()
+    $exists = $command.ExecuteScalar()
+    $connection.Close()
+    return [bool]$exists
+}
+
+# Função: Montar a query UNION dinamicamente
+function Build-UnionQuery {
+    param (
+        [string[]]$TableNames,
+        [string]$Server,
+        [string]$Database
+    )
+
+    $unionParts = @()
+
+    foreach ($table in $TableNames) {
+        if (Test-TableExists -Server $Server -Database $Database -TableName $table) {
+            $unionParts += "SELECT Id, Nome, CPF FROM $table"
+        }
+    }
+
+    if ($unionParts.Count -eq 0) {
+        throw "Nenhuma das tabelas existe na base de dados."
+    }
+
+    return ($unionParts -join " UNION ALL ")
+}
+
+# Função: Executar query SQL
+function Get-SqlData {
+    param(
+        [string]$Server,
+        [string]$Database,
+        [string]$Query
+    )
+    $connectionString = "Server=$Server;Database=$Database;Integrated Security=True;"
+    $connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
+    $command = $connection.CreateCommand()
+    $command.CommandText = $Query
+
+    $adapter = New-Object System.Data.SqlClient.SqlDataAdapter $command
+    $dataTable = New-Object System.Data.DataTable
+    $adapter.Fill($dataTable) | Out-Null
+    return $dataTable
+}
+
+# Função: Gerar HTML Responsivo
+function Convert-ToResponsiveHtml {
+    param (
+        [System.Data.DataTable]$DataTable
+    )
+
+    $style = @"
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
+        th { background-color: #2E86C1; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        @media screen and (max-width: 600px) {
+            table, thead, tbody, th, td, tr { display: block; }
+            td { border: none; border-bottom: 1px solid #eee; position: relative; padding-left: 50%; }
+            td:before { 
+                position: absolute; top: 10px; left: 10px; width: 45%; padding-right: 10px;
+                white-space: nowrap; font-weight: bold;
+            }
+        }
+    </style>
+"@
+
+    $headers = $DataTable.Columns | ForEach-Object { "<th>$($_.ColumnName)</th>" }
+    $rows = foreach ($row in $DataTable.Rows) {
+        $cols = foreach ($col in $DataTable.Columns) {
+            "<td>$($row[$col])</td>"
+        }
+        "<tr>$($cols -join '')</tr>"
+    }
+
+    $html = @"
+<html>
+<head>
+<meta charset='UTF-8'>
+$style
+</head>
+<body>
+<h2>Relatório Consolidado</h2>
+<table>
+    <thead><tr>$($headers -join '')</tr></thead>
+    <tbody>
+        $($rows -join "`n")
+    </tbody>
+</table>
+</body>
+</html>
+"@
+
+    return $html
+}
+
+# Função: Enviar E-mail com HTML
+function Send-HtmlEmail {
+    param (
+        [string]$From,
+        [string]$To,
+        [string]$Subject,
+        [string]$Body,
+        [string]$SmtpServer
+    )
+
+    Send-MailMessage -From $From -To $To -Subject $Subject -Body $Body -BodyAsHtml -SmtpServer $SmtpServer
+}
+
+# Execução Principal
+try {
+    $query = Build-UnionQuery -TableNames $Tabelas -Server $SqlServer -Database $Database
+    $data = Get-SqlData -Server $SqlServer -Database $Database -Query $query
+    $html = Convert-ToResponsiveHtml -DataTable $data
+    Send-HtmlEmail -From $EmailFrom -To $EmailTo -Subject $Subject -Body $html -SmtpServer $SmtpServer
+    Write-Host "Relatório enviado com sucesso!"
+}
+catch {
+    Write-Error "Erro ao gerar ou enviar o relatório: $_"
+}
