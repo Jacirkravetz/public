@@ -1,67 +1,16 @@
-function Convert-ToResponsiveHtml {
-    param (
-        [System.Data.DataTable]$DataTable,
-        [string]$Query
-    )
+Sub InserirHtmlNoEmail()
+    Dim OutlookApp As Object
+    Dim Mail As Object
+    Set OutlookApp = CreateObject("Outlook.Application")
+    Set Mail = OutlookApp.CreateItem(0)
 
-    $style = @"
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h2 { color: #2E86C1; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
-        th { background-color: #2E86C1; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .query-box {
-            background-color: #f4f4f4;
-            border: 1px solid #ccc;
-            padding: 15px;
-            font-family: Consolas, monospace;
-            white-space: pre-wrap;
-            margin-top: 20px;
-        }
-        @media screen and (max-width: 600px) {
-            table, thead, tbody, th, td, tr { display: block; }
-            td { border: none; border-bottom: 1px solid #eee; position: relative; padding-left: 50%; }
-            td:before { 
-                position: absolute; top: 10px; left: 10px; width: 45%; padding-right: 10px;
-                white-space: nowrap; font-weight: bold;
-            }
-        }
-    </style>
-"@
+    Dim html As String
+    html = "<html><body><h2>Teste de HTML</h2><p>Isso é um teste.</p></body></html>" ' substitua por seu HTML
 
-    $headers = $DataTable.Columns | ForEach-Object { "<th>$($_.ColumnName)</th>" }
-    $rows = foreach ($row in $DataTable.Rows) {
-        $cols = foreach ($col in $DataTable.Columns) {
-            "<td>$($row[$col])</td>"
-        }
-        "<tr>$($cols -join '')</tr>"
-    }
-
-    $html = @"
-<html>
-<head>
-<meta charset='UTF-8'>
-$style
-</head>
-<body>
-<h2>Relatório Consolidado</h2>
-
-<div class='query-box'>
-<strong>Query Executada:</strong>
-<pre>$Query</pre>
-</div>
-
-<table>
-    <thead><tr>$($headers -join '')</tr></thead>
-    <tbody>
-        $($rows -join "`n")
-    </tbody>
-</table>
-</body>
-</html>
-"@
-
-    return $html
-}
+    With Mail
+        .To = "destinatario@empresa.com"
+        .Subject = "Teste HTML"
+        .HTMLBody = html
+        .Display
+    End With
+End Sub
