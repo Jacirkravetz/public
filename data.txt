@@ -1,16 +1,2 @@
-Sub InserirHtmlNoEmail()
-    Dim OutlookApp As Object
-    Dim Mail As Object
-    Set OutlookApp = CreateObject("Outlook.Application")
-    Set Mail = OutlookApp.CreateItem(0)
-
-    Dim html As String
-    html = "<html><body><h2>Teste de HTML</h2><p>Isso é um teste.</p></body></html>" ' substitua por seu HTML
-
-    With Mail
-        .To = "destinatario@empresa.com"
-        .Subject = "Teste HTML"
-        .HTMLBody = html
-        .Display
-    End With
-End Sub
+$htmlOneLine = ($html -replace '"', '""') -replace "`r?`n", ""
+$htmlOneLine | Set-Clipboard
