@@ -1,2 +1,28 @@
-$htmlOneLine = ($html -replace '"', '""') -replace "`r?`n", ""
-$htmlOneLine | Set-Clipboard
+# Converte o HTML para uma string adequada ao VBA
+function Convert-HtmlToVbaSafeString {
+    param (
+        [string]$html,
+        [int]$maxLength = 1000
+    )
+
+    $escapedHtml = $html -replace '"', '""'
+    $escapedHtml = $escapedHtml -replace "`r?`n", ""
+    $parts = @()
+    
+    for ($i = 0; $i -lt $escapedHtml.Length; $i += $maxLength) {
+        $part = $escapedHtml.Substring($i, [Math]::Min($maxLength, $escapedHtml.Length - $i))
+        $parts += '    html = html & "' + $part + '"'
+    }
+
+    return @(
+        'Dim html As String',
+        'html = ""',
+        $parts
+    ) -join "`r`n"
+}
+
+# Gere o HTML normalmente (supondo que $html já tenha seu conteúdo)
+$vbaHtmlCode = Convert-HtmlToVbaSafeString -html $html
+
+# Copie para a área de transferência para colar no VBA
+$vbaHtmlCode | Set-Clipboard
