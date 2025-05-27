@@ -1,55 +1,44 @@
-using System.Text.Json;
-using System.ComponentModel.DataAnnotations.Schema;
-
-public class EnrichmentStep
+public static class TemplateHelper
 {
-    public int Id { get; set; }
-    public string StepName { get; set; }
-    public string SqlQuery { get; set; }
-
-    public string ConnectionString { get; set; }
-    public string DestinationColumn { get; set; }
-
-    // JSON-backed string fields
-    public string FilterFieldsJson { get; set; }
-    public string FixedParametersJson { get; set; }
-    public string ApiHeadersJson { get; set; }
-    public string ApiPayloadTemplateJson { get; set; }
-
-    // Propriedades expostas como Dictionary/List
-    [NotMapped]
-    public List<string> FilterFields
+    /// <summary>
+    /// Substitui placeholders no template usando os dados fornecidos e parâmetros fixos.
+    /// </summary>
+    public static string ReplaceTemplate(
+        string template,
+        Dictionary<string, object> data,
+        Dictionary<string, string> fixedParameters = null)
     {
-        get => string.IsNullOrEmpty(FilterFieldsJson) ? new() : JsonSerializer.Deserialize<List<string>>(FilterFieldsJson);
-        set => FilterFieldsJson = JsonSerializer.Serialize(value);
+        if (string.IsNullOrWhiteSpace(template))
+            return template;
+
+        // Combina os dados e os parâmetros fixos em um dicionário unificado
+        var allParameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (fixedParameters != null)
+        {
+            foreach (var kvp in fixedParameters)
+                allParameters[kvp.Key] = kvp.Value;
+        }
+
+        if (data != null)
+        {
+            foreach (var kvp in data)
+            {
+                if (kvp.Value != null)
+                    allParameters[kvp.Key] = kvp.Value.ToString();
+            }
+        }
+
+        // Substitui os placeholders {Campo} e @Campo
+        foreach (var kvp in allParameters)
+        {
+            string placeholderCurly = $"{{{kvp.Key}}}";
+            string placeholderAt = $"@{kvp.Key}";
+
+            template = template.Replace(placeholderCurly, kvp.Value);
+            template = template.Replace(placeholderAt, kvp.Value);
+        }
+
+        return template;
     }
-
-    [NotMapped]
-    public Dictionary<string, string> FixedParameters
-    {
-        get => string.IsNullOrEmpty(FixedParametersJson) ? new() : JsonSerializer.Deserialize<Dictionary<string, string>>(FixedParametersJson);
-        set => FixedParametersJson = JsonSerializer.Serialize(value);
-    }
-
-    [NotMapped]
-    public Dictionary<string, string> ApiHeaders
-    {
-        get => string.IsNullOrEmpty(ApiHeadersJson) ? new() : JsonSerializer.Deserialize<Dictionary<string, string>>(ApiHeadersJson);
-        set => ApiHeadersJson = JsonSerializer.Serialize(value);
-    }
-
-    [NotMapped]
-    public Dictionary<string, string> ApiPayloadTemplate
-    {
-        get => string.IsNullOrEmpty(ApiPayloadTemplateJson) ? new() : JsonSerializer.Deserialize<Dictionary<string, string>>(ApiPayloadTemplateJson);
-        set => ApiPayloadTemplateJson = JsonSerializer.Serialize(value);
-    }
-
-    public bool CacheEnabled { get; set; }
-    public string CacheKeyTemplate { get; set; }
-
-    public bool ApiFallbackEnabled { get; set; }
-    public string ApiUrl { get; set; }
-    public string ApiMethod { get; set; }
-    public string ApiResponseField { get; set; }
 }
