@@ -1,83 +1,241 @@
-# Configurations
-$smtpServer = "smtp.company.com"
-$from = "reports@company.com"
-$to = "user1@company.com;user2@company.com"
-$subject = "Dynamic Report"
-$sqlServer = "YOUR_SERVER"
-$database = "YOUR_DATABASE"
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
-# Create SQL connection
-$connectionString = "Server=$sqlServer;Database=$database;Integrated Security=True;"
-$connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
-$connection.Open()
-
-# Check existing tables
-$possibleTables = "Table1", "Table2", "Table3", "Table4", "Table5"
-$existingTables = @()
-
-foreach ($table in $possibleTables) {
-    $cmd = $connection.CreateCommand()
-    $cmd.CommandText = "IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '$table') SELECT '$table' ELSE SELECT NULL"
-    $result = $cmd.ExecuteScalar()
-    if ($result) { $existingTables += $result }
-}
-
-# Build dynamic query
-$selectStatements = $existingTables | ForEach-Object { "SELECT Id, Name, CPF FROM $_" }
-$finalQuery = ($selectStatements -join " UNION ALL ")
-
-# Execute query only if any table exists
-$dataTable = New-Object System.Data.DataTable
-if (![string]::IsNullOrWhiteSpace($finalQuery)) {
-    $command = $connection.CreateCommand()
-    $command.CommandText = $finalQuery
-
-    $adapter = New-Object System.Data.SqlClient.SqlDataAdapter $command
-    $adapter.Fill($dataTable) | Out-Null
-}
-
-$connection.Close()
-
-# Check current time and data availability
-$currentTime = Get-Date
-$currentHour = $currentTime.Hour
-$hasRows = $dataTable.Rows.Count -gt 0
-$isWithinSchedule = ($currentHour -ge 8 -and $currentHour -lt 21)
-
-if ($hasRows -and $isWithinSchedule) {
-    # Build HTML with results and query
-    $html = @"
-<html>
-<head>
-  <style>
-    body { font-family: Arial; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    pre.query-box { background-color: #eee; padding: 10px; border: 1px solid #ccc; font-size: 12px; white-space: pre-wrap; }
-  </style>
-</head>
-<body>
-  <h2>Report</h2>
-  <pre class="query-box">$finalQuery</pre>
-  <table>
-    <tr><th>ID</th><th>Name</th><th>CPF</th></tr>
-"@
-
-    foreach ($row in $dataTable.Rows) {
-        $html += "<tr><td>$($row.Id)</td><td>$($row.Name)</td><td>$($row.CPF)</td></tr>`n"
+namespace EnrichmentEngine
+{
+    // MODELO
+    public class EnrichmentStepConfig
+    {
+        public string StepName { get; set; }
+        public string ConnectionString { get; set; }
+        public string SqlQuery { get; set; }
+        public string DestinationColumn { get; set; }
+        public List<string> FilterFields { get; set; }
+        public Dictionary<string, string> FixedParameters { get; set; }
+        public bool CacheEnabled { get; set; }
+        public string CacheKeyTemplate { get; set; }
+        public bool ApiFallbackEnabled { get; set; }
+        public string ApiUrl { get; set; }
+        public string ApiMethod { get; set; }
+        public Dictionary<string, string> ApiHeaders { get; set; }
+        public string ApiPayloadTemplate { get; set; }
+        public string ApiResponseField { get; set; }
     }
 
-    $html += @"
-  </table>
-</body>
-</html>
-"@
+    // INTERFACES
+    public interface IEnrichmentStepLoader
+    {
+        Task<EnrichmentStepConfig> LoadStepAsync(string stepName);
+    }
 
-    # Send email
-    Send-MailMessage -From $from -To $to -Subject $subject -Body $html -BodyAsHtml -SmtpServer $smtpServer
-    Write-Host "Email sent successfully."
+    public interface ICacheProvider
+    {
+        string Get(string key);
+        void Set(string key, string value);
+    }
+
+    public interface IApiClient
+    {
+        Task<string> PostAsync(string url, string payload, Dictionary<string, string> headers);
+        Task<string> GetAsync(string url, Dictionary<string, string> headers);
+    }
+
+    public interface IDatabaseProvider
+    {
+        Task<string> ExecuteScalarAsync(string connectionString, string query, Dictionary<string, string> parameters);
+    }
+
+    public interface IEnrichmentEngine
+    {
+        Task<string> EnrichAsync(EnrichmentStepConfig config, Dictionary<string, string> inputData);
+    }
+
+    // IMPLEMENTAÇÕES
+    public class EnrichmentStepLoader : IEnrichmentStepLoader
+    {
+        private readonly string _connectionString;
+
+        public EnrichmentStepLoader(string connectionString) => _connectionString = connectionString;
+
+        public async Task<EnrichmentStepConfig> LoadStepAsync(string stepName)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var cmd = new SqlCommand("SELECT * FROM EnrichmentSteps WHERE StepName = @StepName", conn);
+            cmd.Parameters.AddWithValue("@StepName", stepName);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return new EnrichmentStepConfig
+                {
+                    StepName = reader["StepName"].ToString(),
+                    ConnectionString = reader["ConnectionString"].ToString(),
+                    SqlQuery = reader["SqlQuery"].ToString(),
+                    DestinationColumn = reader["DestinationColumn"].ToString(),
+                    FilterFields = JsonSerializer.Deserialize<List<string>>(reader["FilterFields"].ToString()),
+                    FixedParameters = JsonSerializer.Deserialize<Dictionary<string, string>>(reader["FixedParameters"].ToString()),
+                    CacheEnabled = Convert.ToBoolean(reader["CacheEnabled"]),
+                    CacheKeyTemplate = reader["CacheKeyTemplate"].ToString(),
+                    ApiFallbackEnabled = Convert.ToBoolean(reader["ApiFallbackEnabled"]),
+                    ApiUrl = reader["ApiUrl"].ToString(),
+                    ApiMethod = reader["ApiMethod"].ToString(),
+                    ApiHeaders = string.IsNullOrWhiteSpace(reader["ApiHeaders"].ToString()) ? null :
+                        JsonSerializer.Deserialize<Dictionary<string, string>>(reader["ApiHeaders"].ToString()),
+                    ApiPayloadTemplate = reader["ApiPayloadTemplate"].ToString(),
+                    ApiResponseField = reader["ApiResponseField"].ToString()
+                };
+            }
+
+            return null;
+        }
+    }
+
+    public class MemoryCacheProvider : ICacheProvider
+    {
+        private readonly Dictionary<string, string> _cache = new();
+
+        public string Get(string key) => _cache.ContainsKey(key) ? _cache[key] : null;
+        public void Set(string key, string value) => _cache[key] = value;
+    }
+
+    public class SimpleApiClient : IApiClient
+    {
+        private readonly HttpClient _client = new();
+
+        public async Task<string> PostAsync(string url, string payload, Dictionary<string, string> headers)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+
+            if (headers != null)
+                foreach (var h in headers)
+                    request.Headers.Add(h.Key, h.Value);
+
+            var response = await _client.SendAsync(request);
+            return await response.Content.ReadAsStringAsync();
+        }
+
+        public async Task<string> GetAsync(string url, Dictionary<string, string> headers)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (headers != null)
+                foreach (var h in headers)
+                    request.Headers.Add(h.Key, h.Value);
+
+            var response = await _client.SendAsync(request);
+            return await response.Content.ReadAsStringAsync();
+        }
+    }
+
+    public class SqlDatabaseProvider : IDatabaseProvider
+    {
+        public async Task<string> ExecuteScalarAsync(string connectionString, string query, Dictionary<string, string> parameters)
+        {
+            using var conn = new SqlConnection(connectionString);
+            using var cmd = new SqlCommand(query, conn);
+
+            foreach (var p in parameters)
+                cmd.Parameters.AddWithValue("@" + p.Key, p.Value ?? DBNull.Value);
+
+            await conn.OpenAsync();
+            var result = await cmd.ExecuteScalarAsync();
+            return result?.ToString();
+        }
+    }
+
+    public class EnrichmentEngineService : IEnrichmentEngine
+    {
+        private readonly ICacheProvider _cache;
+        private readonly IApiClient _apiClient;
+        private readonly IDatabaseProvider _db;
+
+        public EnrichmentEngineService(ICacheProvider cache, IApiClient apiClient, IDatabaseProvider db)
+        {
+            _cache = cache;
+            _apiClient = apiClient;
+            _db = db;
+        }
+
+        public async Task<string> EnrichAsync(EnrichmentStepConfig config, Dictionary<string, string> inputData)
+        {
+            var parameters = new Dictionary<string, string>(config.FixedParameters ?? new());
+
+            foreach (var field in config.FilterFields)
+                if (inputData.ContainsKey(field))
+                    parameters[field] = inputData[field];
+
+            string cacheKey = null;
+            if (config.CacheEnabled && !string.IsNullOrEmpty(config.CacheKeyTemplate))
+            {
+                cacheKey = ReplaceTemplate(config.CacheKeyTemplate, parameters);
+                var cached = _cache.Get(cacheKey);
+                if (!string.IsNullOrEmpty(cached))
+                    return cached;
+            }
+
+            var dbResult = await _db.ExecuteScalarAsync(config.ConnectionString, config.SqlQuery, parameters);
+            if (!string.IsNullOrEmpty(dbResult))
+            {
+                if (config.CacheEnabled && cacheKey != null)
+                    _cache.Set(cacheKey, dbResult);
+                return dbResult;
+            }
+
+            if (config.ApiFallbackEnabled && !string.IsNullOrEmpty(config.ApiUrl))
+            {
+                var payload = ReplaceTemplate(config.ApiPayloadTemplate, parameters);
+                var responseJson = config.ApiMethod.ToUpper() == "GET"
+                    ? await _apiClient.GetAsync(config.ApiUrl, config.ApiHeaders)
+                    : await _apiClient.PostAsync(config.ApiUrl, payload, config.ApiHeaders);
+
+                using var doc = JsonDocument.Parse(responseJson);
+                if (doc.RootElement.TryGetProperty(config.ApiResponseField, out var value))
+                {
+                    var val = value.ToString();
+                    if (config.CacheEnabled && cacheKey != null)
+                        _cache.Set(cacheKey, val);
+                    return val;
+                }
+            }
+
+            return null;
+        }
+
+        private string ReplaceTemplate(string template, Dictionary<string, string> values)
+        {
+            return Regex.Replace(template ?? "", @"\{(.*?)\}", match =>
+            {
+                var key = match.Groups[1].Value;
+                return values.ContainsKey(key) ? values[key] : "";
+            });
+        }
+    }
 }
-else {
-    Write-Host "Email NOT sent. Has data: $hasRows | Within schedule: $isWithinSchedule"
-}
+
+
+var loader = new EnrichmentStepLoader("MinhaConnectionString");
+var config = await loader.LoadStepAsync("BuscarCPF");
+
+var engine = new EnrichmentEngineService(
+    new MemoryCacheProvider(),
+    new SimpleApiClient(),
+    new SqlDatabaseProvider()
+);
+
+var result = await engine.EnrichAsync(config, new Dictionary<string, string> {
+    { "Nome", "João" },
+    { "Email", "joao@email.com" }
+});
+
+Console.WriteLine("Resultado: " + result);
