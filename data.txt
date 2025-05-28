@@ -1,27 +1,33 @@
 using System.Collections.Generic;
 using System.Data.SqlClient;
-using System.Linq;
+using System.Text.RegularExpressions;
 
-public void MergeSqlParameters(List<SqlParameter> parameters, Dictionary<string, string> overrides)
+public class TemplateReplacer
 {
-    if (overrides == null || overrides.Count == 0)
-        return;
-
-    foreach (var kvp in overrides)
+    /// <summary>
+    /// Substitui os placeholders do JSON no formato {Nome}, {Idade}, etc., com os valores de um IEnumerable de SqlParameter.
+    /// </summary>
+    /// <param name="template">O JSON com placeholders no formato {Chave}</param>
+    /// <param name="parameters">A lista de SqlParameter contendo os valores de substituição</param>
+    /// <returns>O JSON final com os valores substituídos</returns>
+    public string ReplaceTemplate(string template, IEnumerable<SqlParameter> parameters)
     {
-        var key = kvp.Key.TrimStart('@');
-        var value = kvp.Value;
+        if (string.IsNullOrEmpty(template) || parameters == null)
+            return template;
 
-        // Procura um parâmetro existente com o mesmo nome (ignorando o @)
-        var existingParam = parameters.FirstOrDefault(p => p.ParameterName.TrimStart('@').Equals(key, System.StringComparison.OrdinalIgnoreCase));
+        var paramDict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var param in parameters)
+        {
+            if (param.ParameterName.StartsWith("@"))
+                paramDict[param.ParameterName.Substring(1)] = param.Value;
+            else
+                paramDict[param.ParameterName] = param.Value;
+        }
 
-        if (existingParam != null)
+        return Regex.Replace(template, @"\{(.*?)\}", match =>
         {
-            existingParam.Value = value;
-        }
-        else
-        {
-            parameters.Add(new SqlParameter("@" + key, value));
-        }
+            var key = match.Groups[1].Value;
+            return paramDict.TryGetValue(key, out var value) ? value?.ToString() ?? "" : "";
+        });
     }
 }
