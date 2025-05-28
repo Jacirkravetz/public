@@ -1,23 +1,27 @@
 using System.Collections.Generic;
 using System.Data.SqlClient;
-using System.Text.RegularExpressions;
+using System.Linq;
 
-private string ReplaceTemplate(string template, IEnumerable<SqlParameter> parameters)
+public void MergeSqlParameters(List<SqlParameter> parameters, Dictionary<string, string> overrides)
 {
-    if (string.IsNullOrWhiteSpace(template))
-        return template;
+    if (overrides == null || overrides.Count == 0)
+        return;
 
-    // Cria um dicionário com os parâmetros para busca rápida
-    var parameterDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    foreach (var param in parameters)
+    foreach (var kvp in overrides)
     {
-        if (param.Value != null)
-            parameterDict[param.ParameterName.TrimStart('@')] = param.Value.ToString();
+        var key = kvp.Key.TrimStart('@');
+        var value = kvp.Value;
+
+        // Procura um parâmetro existente com o mesmo nome (ignorando o @)
+        var existingParam = parameters.FirstOrDefault(p => p.ParameterName.TrimStart('@').Equals(key, System.StringComparison.OrdinalIgnoreCase));
+
+        if (existingParam != null)
+        {
+            existingParam.Value = value;
+        }
+        else
+        {
+            parameters.Add(new SqlParameter("@" + key, value));
+        }
     }
-
-    return Regex.Replace(template, @"\{(.*?)\}", match =>
-    {
-        var key = match.Groups[1].Value;
-        return parameterDict.TryGetValue(key, out var value) ? value : string.Empty;
-    });
 }
