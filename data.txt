@@ -1,44 +1,23 @@
-public static class TemplateHelper
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Text.RegularExpressions;
+
+private string ReplaceTemplate(string template, IEnumerable<SqlParameter> parameters)
 {
-    /// <summary>
-    /// Substitui placeholders no template usando os dados fornecidos e parâmetros fixos.
-    /// </summary>
-    public static string ReplaceTemplate(
-        string template,
-        Dictionary<string, object> data,
-        Dictionary<string, string> fixedParameters = null)
-    {
-        if (string.IsNullOrWhiteSpace(template))
-            return template;
-
-        // Combina os dados e os parâmetros fixos em um dicionário unificado
-        var allParameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        if (fixedParameters != null)
-        {
-            foreach (var kvp in fixedParameters)
-                allParameters[kvp.Key] = kvp.Value;
-        }
-
-        if (data != null)
-        {
-            foreach (var kvp in data)
-            {
-                if (kvp.Value != null)
-                    allParameters[kvp.Key] = kvp.Value.ToString();
-            }
-        }
-
-        // Substitui os placeholders {Campo} e @Campo
-        foreach (var kvp in allParameters)
-        {
-            string placeholderCurly = $"{{{kvp.Key}}}";
-            string placeholderAt = $"@{kvp.Key}";
-
-            template = template.Replace(placeholderCurly, kvp.Value);
-            template = template.Replace(placeholderAt, kvp.Value);
-        }
-
+    if (string.IsNullOrWhiteSpace(template))
         return template;
+
+    // Cria um dicionário com os parâmetros para busca rápida
+    var parameterDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var param in parameters)
+    {
+        if (param.Value != null)
+            parameterDict[param.ParameterName.TrimStart('@')] = param.Value.ToString();
     }
+
+    return Regex.Replace(template, @"\{(.*?)\}", match =>
+    {
+        var key = match.Groups[1].Value;
+        return parameterDict.TryGetValue(key, out var value) ? value : string.Empty;
+    });
 }
