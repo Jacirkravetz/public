@@ -1,33 +1,32 @@
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Text.RegularExpressions;
 
-public class TemplateReplacer
-{
-    /// <summary>
-    /// Substitui os placeholders do JSON no formato {Nome}, {Idade}, etc., com os valores de um IEnumerable de SqlParameter.
-    /// </summary>
-    /// <param name="template">O JSON com placeholders no formato {Chave}</param>
-    /// <param name="parameters">A lista de SqlParameter contendo os valores de substituição</param>
-    /// <returns>O JSON final com os valores substituídos</returns>
-    public string ReplaceTemplate(string template, IEnumerable<SqlParameter> parameters)
-    {
-        if (string.IsNullOrEmpty(template) || parameters == null)
-            return template;
+SELECT TOP 1 Resultado
+FROM (
+    SELECT Nome AS Resultado
+    FROM MinhaTabela
+    WHERE Nome = @Valor1
 
-        var paramDict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        foreach (var param in parameters)
-        {
-            if (param.ParameterName.StartsWith("@"))
-                paramDict[param.ParameterName.Substring(1)] = param.Value;
-            else
-                paramDict[param.ParameterName] = param.Value;
-        }
+    UNION ALL
 
-        return Regex.Replace(template, @"\{(.*?)\}", match =>
-        {
-            var key = match.Groups[1].Value;
-            return paramDict.TryGetValue(key, out var value) ? value?.ToString() ?? "" : "";
-        });
-    }
-}
+    SELECT @Valor2
+    WHERE NOT EXISTS (SELECT 1 FROM MinhaTabela WHERE Nome = @Valor1)
+) AS ResultadoFinal;
+
+
+DECLARE @Valor1 NVARCHAR(100) = 'João';
+DECLARE @Valor2 NVARCHAR(100) = 'Valor Padrão';
+
+SELECT ISNULL(
+    (SELECT TOP 1 Nome FROM MinhaTabela WHERE Nome = @Valor1),
+    @Valor2
+) AS Resultado;
+
+
+
+
+DECLARE @Valor1 NVARCHAR(100) = 'João';
+DECLARE @Valor2 NVARCHAR(100) = 'Valor Padrão';
+
+SELECT COALESCE(
+    (SELECT TOP 1 Nome FROM MinhaTabela WHERE Nome = @Valor1),
+    @Valor2
+) AS Resultado;
