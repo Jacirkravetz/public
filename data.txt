@@ -1,16 +1,330 @@
-public void Execute(CancellationToken cancellationToken)
+1. ConfigSession.cs
+csharp
+Copiar
+Editar
+namespace FixMessageReader.Configuration
 {
-    _engineBootstrapper.Start(fixMessage =>
+    public class ConfigSession
     {
-        // Se o token foi cancelado, interrompe o processamento
-        if (cancellationToken.IsCancellationRequested)
+        public string ConfigFilePath { get; set; } = "App.config";
+    }
+}
+2. IFixEngineBootstrapper.cs
+csharp
+Copiar
+Editar
+using QuickFix;
+using FixMessageReader.Configuration;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FixMessageReader.FixEngine
+{
+    public interface IFixEngineBootstrapper
+    {
+        Task StartAsync(Action<Message> onMessageReceived, ConfigSession config, CancellationToken cancellationToken);
+        Task StopAsync();
+    }
+}
+3. IFixMessageHandler.cs
+csharp
+Copiar
+Editar
+using QuickFix;
+
+namespace FixMessageReader.FixEngine
+{
+    public interface IFixMessageHandler : IApplication
+    {
+    }
+}
+4. FixMessageHandler.cs
+csharp
+Copiar
+Editar
+using QuickFix;
+using System;
+
+namespace FixMessageReader.FixEngine
+{
+    public class FixMessageHandler : MessageCracker, IFixMessageHandler
+    {
+        private readonly Action<Message> _onMessageReceived;
+
+        public FixMessageHandler(Action<Message> onMessageReceived)
         {
-            // Opcional: aqui você pode lançar uma exceção, ou simplesmente retornar para interromper o callback
-            return;
+            _onMessageReceived = onMessageReceived ?? throw new ArgumentNullException(nameof(onMessageReceived));
         }
 
-        var tabularMessage = ConvertFixToTabular(fixMessage);
-        _processor.Push(tabularMessage);
+        public void FromApp(Message message, SessionID sessionID)
+        {
+            Console.WriteLine($"[FixMessageHandler] Received message: {message}");
+            Crack(message, sessionID);
+            _onMessageReceived.Invoke(message);
+        }
 
-    }, cancellationToken);
+        public void OnCreate(SessionID sessionID) { }
+        public void OnLogon(SessionID sessionID) => Console.WriteLine($"[FixMessageHandler] Logon: {sessionID}");
+        public void OnLogout(SessionID sessionID) => Console.WriteLine($"[FixMessageHandler] Logout: {sessionID}");
+        public void ToAdmin(Message message, SessionID sessionID) { }
+        public void FromAdmin(Message message, SessionID sessionID) { }
+        public void ToApp(Message message, SessionID sessionID) { }
+    }
 }
+5. FixEngineBootstrapper.cs
+csharp
+Copiar
+Editar
+using QuickFix;
+using FixMessageReader.Configuration;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FixMessageReader.FixEngine
+{
+    public class FixEngineBootstrapper : IFixEngineBootstrapper
+    {
+        private SocketInitiator? _initiator;
+        private TaskCompletionSource<bool>? _stoppedTcs;
+
+        public async Task StartAsync(Action<Message> onMessageReceived, ConfigSession config, CancellationToken cancellationToken)
+        {
+            var handler = new FixMessageHandler(onMessageReceived);
+
+            var settings = new SessionSettings(config.ConfigFilePath);
+            var storeFactory = new FileStoreFactory(settings);
+            var logFactory = new FileLogFactory(settings);
+
+            _initiator = new SocketInitiator(handler, storeFactory, settings, logFactory);
+            _initiator.Start();
+
+            Console.WriteLine("[FixEngineBootstrapper] FIX engine started.");
+
+            _stoppedTcs = new TaskCompletionSource<bool>();
+
+            using (cancellationToken.Register(() =>
+            {
+                Console.WriteLine("[FixEngineBootstrapper] Cancellation requested.");
+                StopAsync().GetAwaiter().GetResult();
+                _stoppedTcs.TrySetResult(true);
+            }))
+            {
+                await _stoppedTcs.Task.ConfigureAwait(false);
+            }
+        }
+
+        public Task StopAsync()
+        {
+            _initiator?.Stop();
+            Console.WriteLine("[FixEngineBootstrapper] FIX engine stopped.");
+            return Task.CompletedTask;
+        }
+    }
+}
+6. BaseProcessor.cs
+csharp
+Copiar
+Editar
+using QuickFix;
+
+namespace FixMessageReader.Services
+{
+    public abstract class BaseProcessor
+    {
+        public abstract void Push(Message message);
+    }
+}
+7. MyCustomProcessor.cs (exemplo)
+csharp
+Copiar
+Editar
+using QuickFix;
+using System;
+
+namespace FixMessageReader.Services
+{
+    public class MyCustomProcessor : BaseProcessor
+    {
+        public override void Push(Message message)
+        {
+            Console.WriteLine($"[MyCustomProcessor] Processing message: {message}");
+            // Aqui você pode implementar gravação no banco, etc.
+        }
+    }
+}
+8. FixProcessingService.cs
+csharp
+Copiar
+Editar
+using QuickFix;
+using FixMessageReader.FixEngine;
+using FixMessageReader.Configuration;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FixMessageReader.Services
+{
+    public class FixProcessingService
+    {
+        private readonly IFixEngineBootstrapper _engineBootstrapper;
+        private readonly BaseProcessor _processor;
+
+        public FixProcessingService(IFixEngineBootstrapper engineBootstrapper, BaseProcessor processor)
+        {
+            _engineBootstrapper = engineBootstrapper ?? throw new ArgumentNullException(nameof(engineBootstrapper));
+            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
+        }
+
+        public async Task ExecuteAsync(ConfigSession configSession, CancellationToken cancellationToken)
+        {
+            await _engineBootstrapper.StartAsync(message =>
+            {
+                _processor.Push(message);
+            }, configSession, cancellationToken);
+        }
+    }
+}
+9. Program.cs
+csharp
+Copiar
+Editar
+using Microsoft.Extensions.DependencyInjection;
+using FixMessageReader.FixEngine;
+using FixMessageReader.Services;
+using FixMessageReader.Configuration;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddSingleton<IFixEngineBootstrapper, FixEngineBootstrapper>();
+        serviceCollection.AddSingleton<BaseProcessor, MyCustomProcessor>();
+        serviceCollection.AddSingleton<FixProcessingService>();
+
+        var serviceProvider = serviceCollection.BuildServiceProvider();
+
+        var service = serviceProvider.GetRequiredService<FixProcessingService>();
+
+        var config = new ConfigSession
+        {
+            ConfigFilePath = "App.config"
+        };
+
+        using var cts = new CancellationTokenSource();
+
+        Console.CancelKeyPress += (s, e) =>
+        {
+            Console.WriteLine("Cancelando operação...");
+            cts.Cancel();
+            e.Cancel = true;
+        };
+
+        await service.ExecuteAsync(config, cts.Token);
+
+        Console.WriteLine("Execução finalizada.");
+    }
+}
+10. Testes unitários para FixProcessingService (usando xUnit + Moq)
+csharp
+Copiar
+Editar
+using Xunit;
+using Moq;
+using System.Threading;
+using System.Threading.Tasks;
+using FixMessageReader.Services;
+using FixMessageReader.FixEngine;
+using FixMessageReader.Configuration;
+using QuickFix;
+using System;
+
+namespace FixMessageReader.Tests
+{
+    public class FixProcessingServiceTests
+    {
+        [Fact]
+        public async Task ExecuteAsync_ShouldCallEngineStartAndProcessMessages()
+        {
+            // Arrange
+            var mockEngine = new Mock<IFixEngineBootstrapper>();
+            var mockProcessor = new Mock<BaseProcessor>();
+
+            var config = new ConfigSession { ConfigFilePath = "fake.config" };
+            var cts = new CancellationTokenSource();
+
+            Action<Message> capturedAction = null!;
+
+            mockEngine
+                .Setup(e => e.StartAsync(It.IsAny<Action<Message>>(), config, cts.Token))
+                .Returns<Action<Message>, ConfigSession, CancellationToken>((onMessage, cfg, token) =>
+                {
+                    capturedAction = onMessage;
+                    return Task.CompletedTask;
+                });
+
+            var service = new FixProcessingService(mockEngine.Object, mockProcessor.Object);
+
+            // Act
+            await service.ExecuteAsync(config, cts.Token);
+
+            // Assert StartAsync foi chamado
+            mockEngine.Verify(e => e.StartAsync(It.IsAny<Action<Message>>(), config, cts.Token), Times.Once);
+
+            // Simula mensagem FIX recebida
+            var fakeMessage = new Message();
+            capturedAction(fakeMessage);
+
+            // Verifica se o processor recebeu a mensagem
+            mockProcessor.Verify(p => p.Push(fakeMessage), Times.Once);
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_ShouldThrowArgumentNullException_WhenEngineIsNull()
+        {
+            // Arrange & Act & Assert
+            var processor = new Mock<BaseProcessor>().Object;
+            Assert.Throws<ArgumentNullException>(() => new FixProcessingService(null!, processor));
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_ShouldThrowArgumentNullException_WhenProcessorIsNull()
+        {
+            // Arrange & Act & Assert
+            var engine = new Mock<IFixEngineBootstrapper>().Object;
+            Assert.Throws<ArgumentNullException>(() => new FixProcessingService(engine, null!));
+        }
+    }
+}
+Como rodar/testar
+Crie um projeto console (.NET 6 ou superior recomendado).
+
+Adicione pacotes NuGet:
+
+QuickFix (biblioteca FIX)
+
+Microsoft.Extensions.DependencyInjection
+
+Moq e xunit + xunit.runner.visualstudio para testes
+
+Adicione os arquivos conforme acima.
+
+Configure seu arquivo App.config para o FIX conforme a biblioteca.
+
+Execute o programa para ver o FIX rodando.
+
+Execute os testes com o dotnet test ou no Visual Studio.
+
+Se precisar, posso ajudar a criar também:
+
+Exemplo de arquivo App.config
+
+Implementação do processamento para gravação em SQL Server
+
+Extensões para processamento assíncrono
