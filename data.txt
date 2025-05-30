@@ -1,32 +1,129 @@
+📁 1. Core/BaseService.cs
+csharp
+Copiar
+Editar
+using QuickFix;
 
-SELECT TOP 1 Resultado
-FROM (
-    SELECT Nome AS Resultado
-    FROM MinhaTabela
-    WHERE Nome = @Valor1
+namespace FixMessageReader.Core;
 
-    UNION ALL
+public abstract class BaseService
+{
+    protected void Push(Message message)
+    {
+        Console.WriteLine($"[BaseService] Push: {message}");
+        // Inserção no banco ou outra lógica
+    }
+}
+📁 2. FixEngine/FixMessageHandler.cs
+csharp
+Copiar
+Editar
+using QuickFix;
 
-    SELECT @Valor2
-    WHERE NOT EXISTS (SELECT 1 FROM MinhaTabela WHERE Nome = @Valor1)
-) AS ResultadoFinal;
+namespace FixMessageReader.FixEngine;
 
+public class FixMessageHandler : MessageCracker, IApplication
+{
+    private readonly Action<Message> _onMessageReceived;
 
-DECLARE @Valor1 NVARCHAR(100) = 'João';
-DECLARE @Valor2 NVARCHAR(100) = 'Valor Padrão';
+    public FixMessageHandler(Action<Message> onMessageReceived)
+    {
+        _onMessageReceived = onMessageReceived;
+    }
 
-SELECT ISNULL(
-    (SELECT TOP 1 Nome FROM MinhaTabela WHERE Nome = @Valor1),
-    @Valor2
-) AS Resultado;
+    public void FromApp(Message message, SessionID sessionID)
+    {
+        Console.WriteLine("[Handler] Received message");
+        Crack(message, sessionID);
+        _onMessageReceived?.Invoke(message);
+    }
 
+    public void OnCreate(SessionID sessionID) { }
+    public void OnLogon(SessionID sessionID) => Console.WriteLine($"[Handler] Logon: {sessionID}");
+    public void OnLogout(SessionID sessionID) => Console.WriteLine($"[Handler] Logout: {sessionID}");
+    public void ToAdmin(Message message, SessionID sessionID) { }
+    public void FromAdmin(Message message, SessionID sessionID) { }
+    public void ToApp(Message message, SessionID sessionID) { }
+}
+📁 3. FixEngine/FixEngineBootstrapper.cs
+csharp
+Copiar
+Editar
+using QuickFix;
 
+namespace FixMessageReader.FixEngine;
 
+public class FixEngineBootstrapper
+{
+    private SocketInitiator? _initiator;
 
-DECLARE @Valor1 NVARCHAR(100) = 'João';
-DECLARE @Valor2 NVARCHAR(100) = 'Valor Padrão';
+    public void Start(Action<Message> onMessageReceived)
+    {
+        var handler = new FixMessageHandler(onMessageReceived);
 
-SELECT COALESCE(
-    (SELECT TOP 1 Nome FROM MinhaTabela WHERE Nome = @Valor1),
-    @Valor2
-) AS Resultado;
+        var settings = new SessionSettings("App.config");
+        var storeFactory = new FileStoreFactory(settings);
+        var logFactory = new FileLogFactory(settings);
+
+        _initiator = new SocketInitiator(handler, storeFactory, settings, logFactory);
+        _initiator.Start();
+
+        Console.WriteLine("[FixEngineBootstrapper] FIX engine started.");
+    }
+
+    public void Stop()
+    {
+        _initiator?.Stop();
+        Console.WriteLine("[FixEngineBootstrapper] FIX engine stopped.");
+    }
+}
+📁 4. Services/FixProcessingService.cs
+csharp
+Copiar
+Editar
+using FixMessageReader.Core;
+using FixMessageReader.FixEngine;
+using QuickFix;
+
+namespace FixMessageReader.Services;
+
+public class FixProcessingService : BaseService
+{
+    private readonly FixEngineBootstrapper _fixBootstrapper;
+
+    public FixProcessingService(FixEngineBootstrapper fixBootstrapper)
+    {
+        _fixBootstrapper = fixBootstrapper;
+    }
+
+    public void Execute()
+    {
+        _fixBootstrapper.Start(ExecuteStep);
+        Console.WriteLine("[FixProcessingService] Press Enter to stop.");
+        Console.ReadLine();
+        _fixBootstrapper.Stop();
+    }
+
+    public void ExecuteStep(Message message)
+    {
+        Console.WriteLine($"[FixProcessingService] Executing step. MsgType: {message.Header.GetString(35)}");
+        Push(message);
+    }
+}
+📁 5. Program.cs
+csharp
+Copiar
+Editar
+using FixMessageReader.FixEngine;
+using FixMessageReader.Services;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection();
+
+services.AddSingleton<FixEngineBootstrapper>();
+services.AddScoped<FixProcessingService>();
+
+var provider = services.BuildServiceProvider();
+
+var service = provider.GetRequiredService<FixProcessingService>();
+service.Execute();
