@@ -1,129 +1,172 @@
-📁 1. Core/BaseService.cs
-csharp
-Copiar
-Editar
+// ==============================
+// Arquivo: IFixEngineBootstrapper.cs
+// ==============================
 using QuickFix;
+using System;
 
-namespace FixMessageReader.Core;
-
-public abstract class BaseService
+namespace FixMessageReader.FixEngine
 {
-    protected void Push(Message message)
+    public interface IFixEngineBootstrapper
     {
-        Console.WriteLine($"[BaseService] Push: {message}");
-        // Inserção no banco ou outra lógica
+        void Start(Action<Message> onMessageReceived);
+        void Stop();
     }
 }
-📁 2. FixEngine/FixMessageHandler.cs
-csharp
-Copiar
-Editar
+
+// ==============================
+// Arquivo: IFixMessageHandler.cs
+// ==============================
 using QuickFix;
 
-namespace FixMessageReader.FixEngine;
-
-public class FixMessageHandler : MessageCracker, IApplication
+namespace FixMessageReader.FixEngine
 {
-    private readonly Action<Message> _onMessageReceived;
-
-    public FixMessageHandler(Action<Message> onMessageReceived)
+    public interface IFixMessageHandler : IApplication
     {
-        _onMessageReceived = onMessageReceived;
     }
-
-    public void FromApp(Message message, SessionID sessionID)
-    {
-        Console.WriteLine("[Handler] Received message");
-        Crack(message, sessionID);
-        _onMessageReceived?.Invoke(message);
-    }
-
-    public void OnCreate(SessionID sessionID) { }
-    public void OnLogon(SessionID sessionID) => Console.WriteLine($"[Handler] Logon: {sessionID}");
-    public void OnLogout(SessionID sessionID) => Console.WriteLine($"[Handler] Logout: {sessionID}");
-    public void ToAdmin(Message message, SessionID sessionID) { }
-    public void FromAdmin(Message message, SessionID sessionID) { }
-    public void ToApp(Message message, SessionID sessionID) { }
 }
-📁 3. FixEngine/FixEngineBootstrapper.cs
-csharp
-Copiar
-Editar
+
+// ==============================
+// Arquivo: FixMessageHandler.cs
+// ==============================
 using QuickFix;
 
-namespace FixMessageReader.FixEngine;
-
-public class FixEngineBootstrapper
+namespace FixMessageReader.FixEngine
 {
-    private SocketInitiator? _initiator;
-
-    public void Start(Action<Message> onMessageReceived)
+    public class FixMessageHandler : MessageCracker, IFixMessageHandler
     {
-        var handler = new FixMessageHandler(onMessageReceived);
+        private readonly Action<Message> _onMessageReceived;
 
-        var settings = new SessionSettings("App.config");
-        var storeFactory = new FileStoreFactory(settings);
-        var logFactory = new FileLogFactory(settings);
+        public FixMessageHandler(Action<Message> onMessageReceived)
+        {
+            _onMessageReceived = onMessageReceived;
+        }
 
-        _initiator = new SocketInitiator(handler, storeFactory, settings, logFactory);
-        _initiator.Start();
+        public void FromApp(Message message, SessionID sessionID)
+        {
+            Console.WriteLine("[Handler] Received message");
+            Crack(message, sessionID);
+            _onMessageReceived?.Invoke(message);
+        }
 
-        Console.WriteLine("[FixEngineBootstrapper] FIX engine started.");
-    }
-
-    public void Stop()
-    {
-        _initiator?.Stop();
-        Console.WriteLine("[FixEngineBootstrapper] FIX engine stopped.");
+        public void OnCreate(SessionID sessionID) { }
+        public void OnLogon(SessionID sessionID) => Console.WriteLine($"[Handler] Logon: {sessionID}");
+        public void OnLogout(SessionID sessionID) => Console.WriteLine($"[Handler] Logout: {sessionID}");
+        public void ToAdmin(Message message, SessionID sessionID) { }
+        public void FromAdmin(Message message, SessionID sessionID) { }
+        public void ToApp(Message message, SessionID sessionID) { }
     }
 }
-📁 4. Services/FixProcessingService.cs
-csharp
-Copiar
-Editar
-using FixMessageReader.Core;
+
+// ==============================
+// Arquivo: FixEngineBootstrapper.cs
+// ==============================
+using QuickFix;
+
+namespace FixMessageReader.FixEngine
+{
+    public class FixEngineBootstrapper : IFixEngineBootstrapper
+    {
+        private SocketInitiator? _initiator;
+
+        public void Start(Action<Message> onMessageReceived)
+        {
+            var handler = new FixMessageHandler(onMessageReceived);
+
+            var settings = new SessionSettings("App.config");
+            var storeFactory = new FileStoreFactory(settings);
+            var logFactory = new FileLogFactory(settings);
+
+            _initiator = new SocketInitiator(handler, storeFactory, settings, logFactory);
+            _initiator.Start();
+
+            Console.WriteLine("[FixEngineBootstrapper] FIX engine started.");
+        }
+
+        public void Stop()
+        {
+            _initiator?.Stop();
+            Console.WriteLine("[FixEngineBootstrapper] FIX engine stopped.");
+        }
+    }
+}
+
+// ==============================
+// Arquivo: FixProcessingService.cs
+// ==============================
+using QuickFix;
 using FixMessageReader.FixEngine;
-using QuickFix;
 
-namespace FixMessageReader.Services;
-
-public class FixProcessingService : BaseService
+namespace FixMessageReader.Services
 {
-    private readonly FixEngineBootstrapper _fixBootstrapper;
-
-    public FixProcessingService(FixEngineBootstrapper fixBootstrapper)
+    public class FixProcessingService
     {
-        _fixBootstrapper = fixBootstrapper;
-    }
+        private readonly IFixEngineBootstrapper _engineBootstrapper;
+        private readonly BaseProcessor _processor;
 
-    public void Execute()
-    {
-        _fixBootstrapper.Start(ExecuteStep);
-        Console.WriteLine("[FixProcessingService] Press Enter to stop.");
-        Console.ReadLine();
-        _fixBootstrapper.Stop();
-    }
+        public FixProcessingService(IFixEngineBootstrapper engineBootstrapper, BaseProcessor processor)
+        {
+            _engineBootstrapper = engineBootstrapper;
+            _processor = processor;
+        }
 
-    public void ExecuteStep(Message message)
-    {
-        Console.WriteLine($"[FixProcessingService] Executing step. MsgType: {message.Header.GetString(35)}");
-        Push(message);
+        public void Execute()
+        {
+            _engineBootstrapper.Start(message => _processor.Push(message));
+        }
     }
 }
-📁 5. Program.cs
-csharp
-Copiar
-Editar
+
+// ==============================
+// Arquivo: BaseProcessor.cs
+// ==============================
+using QuickFix;
+
+namespace FixMessageReader.Services
+{
+    public abstract class BaseProcessor
+    {
+        public abstract void Push(Message message);
+    }
+}
+
+// ==============================
+// Arquivo: MyCustomProcessor.cs
+// ==============================
+using QuickFix;
+
+namespace FixMessageReader.Services
+{
+    public class MyCustomProcessor : BaseProcessor
+    {
+        public override void Push(Message message)
+        {
+            Console.WriteLine($"[MyCustomProcessor] Processing: {message}");
+            // Gravação no banco ou lógica de domínio vai aqui
+        }
+    }
+}
+
+// ==============================
+// Arquivo: Program.cs
+// ==============================
+using Microsoft.Extensions.DependencyInjection;
 using FixMessageReader.FixEngine;
 using FixMessageReader.Services;
-using Microsoft.Extensions.DependencyInjection;
 
-var services = new ServiceCollection();
+class Program
+{
+    static void Main(string[] args)
+    {
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddSingleton<IFixEngineBootstrapper, FixEngineBootstrapper>();
+        serviceCollection.AddSingleton<BaseProcessor, MyCustomProcessor>();
+        serviceCollection.AddSingleton<FixProcessingService>();
 
-services.AddSingleton<FixEngineBootstrapper>();
-services.AddScoped<FixProcessingService>();
+        var serviceProvider = serviceCollection.BuildServiceProvider();
 
-var provider = services.BuildServiceProvider();
+        var service = serviceProvider.GetRequiredService<FixProcessingService>();
+        service.Execute();
 
-var service = provider.GetRequiredService<FixProcessingService>();
-service.Execute();
+        Console.ReadLine();
+    }
+}
