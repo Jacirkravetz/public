@@ -1,74 +1,102 @@
-using QuickFix;
-using QuickFix.Transport;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Threading.Tasks;
+using QuickFix;
 
-class Program
+public class FixSessionManager
 {
-    static async Task Main(string[] args)
+    private string _tempDictionaryPath;
+
+    public SocketInitiator CreateInitiator(string fixConfig, string base64Dictionary, IApplication application, IMessageStoreFactory storeFactory, ILogFactory logFactory)
     {
-        string fixConfig = @"
-[DEFAULT]
-ConnectionType=initiator
-ReconnectInterval=5
-SenderCompID=CLIENT
-TargetCompID=SERVER
-BeginString=FIX.4.2
-SocketConnectHost=127.0.0.1
-SocketConnectPort=5001
-StartTime=00:00:00
-EndTime=23:59:59
-HeartBtInt=30
-FileLogPath=log
-UseDataDictionary=Y
+        // 1. Decodificar base64 para XML
+        string xmlContent = Encoding.UTF8.GetString(Convert.FromBase64String(base64Dictionary));
 
-[SESSION]
-SessionQualifier=DEFAULT
-";
+        // 2. Salvar temporariamente o DataDictionary
+        _tempDictionaryPath = Path.Combine(Path.GetTempPath(), $"fix-dictionary-temp-{Guid.NewGuid()}.xml");
+        File.WriteAllText(_tempDictionaryPath, xmlContent);
 
-        // ⚠️ Coloque aqui o conteúdo base64 real do seu FIX42.xml ou outro dicionário
-        string base64Dictionary = "<SEU_DATA_DICTIONARY_EM_BASE64_AQUI>";
+        // 3. Modificar fixConfig para usar o arquivo temporário
+        string fixedConfig = FixConfigWithDictionaryPath(fixConfig, _tempDictionaryPath);
 
-        try
+        // 4. Carregar o SessionSettings da string modificada
+        var settings = LoadSessionSettingsFromString(fixedConfig);
+
+        // 5. Criar e retornar o SocketInitiator
+        var initiator = new SocketInitiator(application, storeFactory, settings, logFactory);
+        return initiator;
+    }
+
+    // Remove a chave DataDictionary antiga e adiciona o novo caminho na seção DEFAULT e SESSION (se existir)
+    private string FixConfigWithDictionaryPath(string config, string dictionaryPath)
+    {
+        var lines = new List<string>(config.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
+        bool inDefaultSection = false;
+        bool inSessionSection = false;
+
+        for (int i = 0; i < lines.Count; i++)
         {
-            // 1. Carregar configurações da sessão a partir da string
-            using var reader = new StringReader(fixConfig);
-            var settings = new SessionSettings(reader);
+            var line = lines[i].Trim();
 
-            // 2. Decodificar base64 e carregar o DataDictionary
-            string xml = Encoding.UTF8.GetString(Convert.FromBase64String(base64Dictionary));
-            using var xmlStream = new MemoryStream(Encoding.UTF8.GetBytes(xml));
-            var dictionary = new DataDictionary.DataDictionary(xmlStream);
-
-            // 3. Criar application, factory e iniciar a sessão
-            var app = new MyFixApplication();
-            var storeFactory = new FileStoreFactory(settings);
-            var logFactory = new FileLogFactory(settings);
-            var initiator = new SocketInitiator(app, storeFactory, settings, logFactory);
-
-            // 4. Associar manualmente o DataDictionary à sessão (em memória)
-            foreach (SessionID sessionId in settings.GetSessionIDs())
+            if (line.StartsWith("[DEFAULT]", StringComparison.OrdinalIgnoreCase))
             {
-                Session session = Session.LookupSession(sessionId);
-                if (session == null)
-                    throw new Exception($"Sessão não encontrada: {sessionId}");
-
-                session.SetDataDictionary(dictionary);
+                inDefaultSection = true;
+                inSessionSection = false;
+            }
+            else if (line.StartsWith("[SESSION]", StringComparison.OrdinalIgnoreCase))
+            {
+                inDefaultSection = false;
+                inSessionSection = true;
+            }
+            else if (line.StartsWith("[") && line.EndsWith("]"))
+            {
+                inDefaultSection = false;
+                inSessionSection = false;
             }
 
-            // 5. Iniciar FIX
-            initiator.Start();
-            Console.WriteLine("FIX iniciado. Pressione ENTER para encerrar...");
-            await Task.Run(() => Console.ReadLine());
-
-            initiator.Stop();
-            Console.WriteLine("FIX encerrado.");
+            // Substituir ou adicionar DataDictionary na seção DEFAULT e SESSION
+            if ((inDefaultSection || inSessionSection) && line.StartsWith("DataDictionary", StringComparison.OrdinalIgnoreCase))
+            {
+                lines[i] = $"DataDictionary={dictionaryPath}";
+            }
         }
-        catch (Exception ex)
+
+        // Se não achou DataDictionary na DEFAULT, adiciona no final da DEFAULT
+        if (!lines.Exists(l => l.TrimStart().StartsWith("DataDictionary", StringComparison.OrdinalIgnoreCase)))
         {
-            Console.WriteLine($"Erro: {ex.Message}");
+            int defaultIndex = lines.FindIndex(l => l.Trim().Equals("[DEFAULT]", StringComparison.OrdinalIgnoreCase));
+            if (defaultIndex >= 0)
+            {
+                // Procurar onde termina a DEFAULT para inserir logo após
+                int insertIndex = defaultIndex + 1;
+                while (insertIndex < lines.Count && !lines[insertIndex].StartsWith("["))
+                    insertIndex++;
+
+                lines.Insert(insertIndex, $"DataDictionary={dictionaryPath}");
+            }
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    // Carrega SessionSettings de uma string INI (usando MemoryStream)
+    private SessionSettings LoadSessionSettingsFromString(string iniContent)
+    {
+        using var ms = new MemoryStream(Encoding.UTF8.GetBytes(iniContent));
+        return new SessionSettings(ms);
+    }
+
+    // Método para limpar arquivo temporário quando não for mais necessário
+    public void Cleanup()
+    {
+        if (_tempDictionaryPath != null && File.Exists(_tempDictionaryPath))
+        {
+            try
+            {
+                File.Delete(_tempDictionaryPath);
+            }
+            catch { /* ignore */ }
         }
     }
 }
