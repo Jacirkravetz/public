@@ -1,65 +1,74 @@
+using QuickFix;
+using QuickFix.Transport;
 using System;
 using System.IO;
 using System.Text;
-using QuickFix;
+using System.Threading.Tasks;
 
-public class FixSessionFactory
+class Program
 {
-    public static SessionSettings CriarSessaoFixComDictionary(string fixConfig, string base64Dictionary, string sessionIDStr)
+    static async Task Main(string[] args)
     {
-        // 1. Lê as configurações da sessão FIX a partir da string
-        SessionSettings settings;
-        using (var configStream = new MemoryStream(Encoding.UTF8.GetBytes(fixConfig)))
-        {
-            settings = new SessionSettings(configStream);
-        }
-
-        // 2. Decodifica o conteúdo base64 do DataDictionary
-        var dictionaryBytes = Convert.FromBase64String(base64Dictionary);
-        var dictionaryContent = Encoding.UTF8.GetString(dictionaryBytes);
-
-        // 3. Cria o DataDictionary a partir da string (em memória)
-        DataDictionary.DataDictionary dd;
-        using (var dictStream = new MemoryStream(Encoding.UTF8.GetBytes(dictionaryContent)))
-        {
-            dd = new DataDictionary.DataDictionary(dictStream);
-        }
-
-        // 4. Configura o provedor de sessão usando o dictionary carregado
-        var sessionID = new SessionID(sessionIDStr); // exemplo: "FIX.4.4:CLIENT->SERVER"
-
-        var myApplication = new MyFixApplication(); // Implementação personalizada de IApplication
-        var storeFactory = new MemoryStoreFactory();
-        var logFactory = new ScreenLogFactory(true, true, true); // pode usar outras opções
-
-        var messageFactory = new DefaultMessageFactory();
-
-        var session = new Session(myApplication, storeFactory, sessionID, dd,
-                                  settings.Get(sessionID), logFactory, messageFactory);
-
-        return settings;
-    }
-}
-
-
-string fixConfig = @"
+        string fixConfig = @"
 [DEFAULT]
 ConnectionType=initiator
-ReconnectInterval=60
+ReconnectInterval=5
 SenderCompID=CLIENT
 TargetCompID=SERVER
-BeginString=FIX.4.4
+BeginString=FIX.4.2
 SocketConnectHost=127.0.0.1
 SocketConnectPort=5001
 StartTime=00:00:00
 EndTime=23:59:59
 HeartBtInt=30
+FileLogPath=log
+UseDataDictionary=Y
 
 [SESSION]
-"; // você pode parametrizar isso
+SessionQualifier=DEFAULT
+";
 
-string base64Dictionary = Convert.ToBase64String(File.ReadAllBytes("FIX44.xml")); // exemplo
-string sessionID = "FIX.4.4:CLIENT->SERVER";
+        // ⚠️ Coloque aqui o conteúdo base64 real do seu FIX42.xml ou outro dicionário
+        string base64Dictionary = "<SEU_DATA_DICTIONARY_EM_BASE64_AQUI>";
 
-var settings = FixSessionFactory.CriarSessaoFixComDictionary(fixConfig, base64Dictionary, sessionID);
+        try
+        {
+            // 1. Carregar configurações da sessão a partir da string
+            using var reader = new StringReader(fixConfig);
+            var settings = new SessionSettings(reader);
 
+            // 2. Decodificar base64 e carregar o DataDictionary
+            string xml = Encoding.UTF8.GetString(Convert.FromBase64String(base64Dictionary));
+            using var xmlStream = new MemoryStream(Encoding.UTF8.GetBytes(xml));
+            var dictionary = new DataDictionary.DataDictionary(xmlStream);
+
+            // 3. Criar application, factory e iniciar a sessão
+            var app = new MyFixApplication();
+            var storeFactory = new FileStoreFactory(settings);
+            var logFactory = new FileLogFactory(settings);
+            var initiator = new SocketInitiator(app, storeFactory, settings, logFactory);
+
+            // 4. Associar manualmente o DataDictionary à sessão (em memória)
+            foreach (SessionID sessionId in settings.GetSessionIDs())
+            {
+                Session session = Session.LookupSession(sessionId);
+                if (session == null)
+                    throw new Exception($"Sessão não encontrada: {sessionId}");
+
+                session.SetDataDictionary(dictionary);
+            }
+
+            // 5. Iniciar FIX
+            initiator.Start();
+            Console.WriteLine("FIX iniciado. Pressione ENTER para encerrar...");
+            await Task.Run(() => Console.ReadLine());
+
+            initiator.Stop();
+            Console.WriteLine("FIX encerrado.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro: {ex.Message}");
+        }
+    }
+}
