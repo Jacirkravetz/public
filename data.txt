@@ -100,3 +100,101 @@ public class FixSessionManager
         }
     }
 }
+
+
+using QuickFix;
+
+public interface IFixSessionManager
+{
+    /// <summary>
+    /// Cria e retorna um SocketInitiator configurado com as configurações FIX e DataDictionary em base64.
+    /// </summary>
+    /// <param name="fixConfig">Configuração FIX em formato INI.</param>
+    /// <param name="base64Dictionary">DataDictionary XML codificado em base64.</param>
+    /// <param name="application">Implementação da interface IApplication para eventos FIX.</param>
+    /// <param name="storeFactory">Fábrica de armazenamento de mensagens.</param>
+    /// <param name="logFactory">Fábrica para logs do FIX.</param>
+    /// <returns>SocketInitiator configurado e pronto para iniciar.</returns>
+    SocketInitiator CreateInitiator(string fixConfig, string base64Dictionary, IApplication application, IMessageStoreFactory storeFactory, ILogFactory logFactory);
+
+    /// <summary>
+    /// Remove arquivos temporários e libera recursos relacionados à sessão.
+    /// </summary>
+    void Cleanup();
+}
+
+
+
+public class FixSessionManager : IFixSessionManager
+{
+    private string _tempDictionaryPath;
+
+    public SocketInitiator CreateInitiator(string fixConfig, string base64Dictionary, IApplication application, IMessageStoreFactory storeFactory, ILogFactory logFactory)
+    {
+        string xmlContent = Encoding.UTF8.GetString(Convert.FromBase64String(base64Dictionary));
+
+        _tempDictionaryPath = Path.Combine(Path.GetTempPath(), $"fix-dictionary-temp-{Guid.NewGuid()}.xml");
+        File.WriteAllText(_tempDictionaryPath, xmlContent);
+
+        string fixedConfig = FixConfigWithDictionaryPath(fixConfig, _tempDictionaryPath);
+        var settings = LoadSessionSettingsFromString(fixedConfig);
+
+        return new SocketInitiator(application, storeFactory, settings, logFactory);
+    }
+
+    public void Cleanup()
+    {
+        if (_tempDictionaryPath != null && File.Exists(_tempDictionaryPath))
+        {
+            try
+            {
+                File.Delete(_tempDictionaryPath);
+            }
+            catch { /* ignorar erro */ }
+        }
+    }
+
+    // ... (restante dos métodos FixConfigWithDictionaryPath e LoadSessionSettingsFromString)
+}
+
+
+// Suponha que você tenha:
+
+string fixConfig = @"
+[DEFAULT]
+ConnectionType=initiator
+ReconnectInterval=5
+SenderCompID=CLIENT
+TargetCompID=SERVER
+BeginString=FIX.4.2
+SocketConnectHost=127.0.0.1
+SocketConnectPort=5001
+StartTime=00:00:00
+EndTime=23:59:59
+HeartBtInt=30
+FileLogPath=log
+UseDataDictionary=Y
+
+[SESSION]
+SessionQualifier=DEFAULT
+";
+
+string base64Dictionary = "PHh... (seu XML Base64) ...PC94"; // Exemplo
+
+// Implementações obrigatórias para a aplicação FIX (IApplication, IMessageStoreFactory, ILogFactory)
+IApplication app = new MyFixApplication();
+IMessageStoreFactory storeFactory = new FileStoreFactory(new SessionSettings()); // ou outro StoreFactory
+ILogFactory logFactory = new FileLogFactory(new SessionSettings());
+
+// Criar o manager
+var manager = new FixSessionManager();
+
+// Criar e iniciar o Initiator
+SocketInitiator initiator = manager.CreateInitiator(fixConfig, base64Dictionary, app, storeFactory, logFactory);
+
+initiator.Start();
+
+// ... depois de usar, liberar recursos e apagar arquivo temporário
+// initiator.Stop();
+// manager.Cleanup();
+
