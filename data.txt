@@ -1,21 +1,18 @@
-event Action<Message, SessionID>? MessageReceived;
+sessionManager.MessageReceived += (message, sessionID) =>
+{
+    // Chama o método async, mas não bloqueia o evento
+    _ = HandleMessageAsync(message, sessionID);
+};
 
-    public event Action<Message, SessionID>? MessageReceived;
-
-
-
-_handler.MessageReceived += (message, sessionID) =>
-        {
-            MessageReceived?.Invoke(message, sessionID);
-        };
-
-
-
- // Aqui você assina o evento para receber as mensagens
-        sessionManager.MessageReceived += (message, sessionID) =>
-        {
-            Console.WriteLine($"Received message from session {sessionID}: {message}");
-            // Faça o push para outras partes do sistema, tratamento, etc
-        };
-
-        await sessionManager.StartAsync(CancellationToken.None);
+async Task HandleMessageAsync(Message message, SessionID sessionID)
+{
+    try
+    {
+        Console.WriteLine($"Received message from session {sessionID}: {message}");
+        await PushAsync(message, sessionID);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error processing message: {ex}");
+    }
+}
