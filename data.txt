@@ -1,94 +1,123 @@
 public interface IFixSessionManager
 {
-    event Func<Message, SessionID, Task>? MessageReceived;
-
-    void ConfigureSession();
+    Task ConfigureSessionAsync(CancellationToken cancellationToken);
     Task StartAsync(CancellationToken cancellationToken);
+    Task StopAsync(CancellationToken cancellationToken);
     Task SendMessageAsync(Message message, CancellationToken cancellationToken);
+
+    event Func<Message, SessionID, Task>? MessageReceived;
 }
 
 
+
+using QuickFix;
+using QuickFix.Transport;
 
 public class FixSessionManager : IFixSessionManager
 {
+    private readonly ILogger<FixSessionManager> _logger;
+    private SocketInitiator? _initiator;
+    private SessionID? _sessionID;
+    private SessionSettings? _settings;
+    private IFixMessageHandler? _handler;
+
+    private DateTime _lastLogonTime;
+
     public event Func<Message, SessionID, Task>? MessageReceived;
 
-    private FixMessageHandler _handler;
-
-    public void ConfigureSession()
+    public FixSessionManager(ILogger<FixSessionManager> logger)
     {
-        _handler = new FixMessageHandler(/*logger*/);
+        _logger = logger;
+    }
 
-        _handler.MessageReceived += async (message, sessionID) =>
+    public async Task ConfigureSessionAsync(CancellationToken cancellationToken)
+    {
+        _settings = new SessionSettings("Config/fixconfig.cfg");
+
+        _handler = new FixMessageHandler(_logger);
+        _handler.OnLogonEvent += OnLogon;
+        _handler.OnLogoutEvent += OnLogout;
+        _handler.OnAppMessageReceived += async (message, sessionId) =>
         {
+            _logger.LogInformation("Dispatching received application message.");
             if (MessageReceived != null)
-            {
-                // Invoca todos os subscribers async, aguardando todos terminarem
-                Delegate[] invocationList = MessageReceived.GetInvocationList();
-
-                var tasks = invocationList
-                    .Cast<Func<Message, SessionID, Task>>()
-                    .Select(handler => handler.Invoke(message, sessionID));
-
-                await Task.WhenAll(tasks);
-            }
+                await MessageReceived.Invoke(message, sessionId);
         };
 
-        // Configuração do initiator etc...
-    }
+        var storeFactory = new FileStoreFactory(_settings);
+        var logFactory = new FileLogFactory(_settings);
+        var messageFactory = new DefaultMessageFactory();
 
-    // demais métodos...
-}
+        _initiator = new SocketInitiator(_handler, storeFactory, _settings, logFactory, messageFactory);
 
-
-
-public class FixMessageHandler : IApplication
-{
-    public event Func<Message, SessionID, Task>? MessageReceived;
-
-    public void FromApp(Message message, SessionID sessionID)
-    {
-        if (MessageReceived != null)
+        // Assume single session
+        var sessionIds = _settings.GetSessions();
+        if (sessionIds.Count > 0)
         {
-            var invocationList = MessageReceived.GetInvocationList();
-
-            var tasks = invocationList
-                .Cast<Func<Message, SessionID, Task>>()
-                .Select(handler => handler.Invoke(message, sessionID));
-
-            Task.WhenAll(tasks).GetAwaiter().GetResult(); // Bloqueia aqui para garantir processamento (ou você pode fazer async, depende do contexto)
+            _sessionID = sessionIds[0];
         }
-    }
-
-    // Outros métodos IApplication
-}
-
-
-
-class Program
-{
-    static async Task Main()
-    {
-        IFixSessionManager sessionManager = new FixSessionManager(/*logger*/);
-        sessionManager.ConfigureSession();
-
-        sessionManager.MessageReceived += async (message, sessionID) =>
+        else
         {
-            Console.WriteLine($"Received message from session {sessionID}: {message}");
-            await PushAsync(message, sessionID);
-        };
+            _logger.LogError("No session found in config.");
+            throw new InvalidOperationException("SessionID not found.");
+        }
 
-        await sessionManager.StartAsync(CancellationToken.None);
-
-        // resto do código...
+        _logger.LogInformation("Session configured.");
     }
 
-    static async Task PushAsync(Message message, SessionID sessionID)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        // Simula push async para outro sistema
-        await Task.Delay(10);
-        Console.WriteLine("Message pushed!");
+        _initiator?.Start();
+        _logger.LogInformation("FIX session started.");
+        await Task.CompletedTask;
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _initiator?.Stop();
+        _logger.LogInformation("FIX session stopped.");
+        await Task.CompletedTask;
+    }
+
+    public async Task SendMessageAsync(Message message, CancellationToken cancellationToken)
+    {
+        if (_sessionID == null)
+        {
+            _logger.LogError("Cannot send message: session not configured.");
+            return;
+        }
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var session = Session.LookupSession(_sessionID);
+            if (session != null && session.IsLoggedOn && IsSessionReadyToSend(session))
+            {
+                _logger.LogInformation("Sending message: {0}", message.ToString());
+                session.Send(message);
+                return;
+            }
+
+            _logger.LogWarning("Session not ready. Retrying...");
+            await Task.Delay(500, cancellationToken);
+        }
+
+        _logger.LogWarning("Message send was cancelled.");
+    }
+
+    private void OnLogon(SessionID sessionID)
+    {
+        _lastLogonTime = DateTime.UtcNow;
+        _logger.LogInformation("Logon successful: {0}", sessionID);
+    }
+
+    private void OnLogout(SessionID sessionID)
+    {
+        _logger.LogInformation("Logout received: {0}", sessionID);
+    }
+
+    private bool IsSessionReadyToSend(Session session)
+    {
+        // Simples: espera 2 segundos após logon para garantir sincronização de SeqNum
+        return session.IsLoggedOn && (DateTime.UtcNow - _lastLogonTime > TimeSpan.FromSeconds(2));
     }
 }
-
-
