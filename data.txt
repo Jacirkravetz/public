@@ -1,123 +1,65 @@
-public interface IFixSessionManager
-{
-    Task ConfigureSessionAsync(CancellationToken cancellationToken);
-    Task StartAsync(CancellationToken cancellationToken);
-    Task StopAsync(CancellationToken cancellationToken);
-    Task SendMessageAsync(Message message, CancellationToken cancellationToken);
-
-    event Func<Message, SessionID, Task>? MessageReceived;
-}
-
-
-
 using QuickFix;
-using QuickFix.Transport;
 
-public class FixSessionManager : IFixSessionManager
+public interface IFixMessageHandler : IApplication
 {
-    private readonly ILogger<FixSessionManager> _logger;
-    private SocketInitiator? _initiator;
-    private SessionID? _sessionID;
-    private SessionSettings? _settings;
-    private IFixMessageHandler? _handler;
+    event Action<SessionID>? OnLogonEvent;
+    event Action<SessionID>? OnLogoutEvent;
+    event Func<Message, SessionID, Task>? OnAppMessageReceived;
+}
+using QuickFix;
 
-    private DateTime _lastLogonTime;
+public class FixMessageHandler : IFixMessageHandler
+{
+    private readonly ILogger<FixMessageHandler> _logger;
 
-    public event Func<Message, SessionID, Task>? MessageReceived;
+    public event Action<SessionID>? OnLogonEvent;
+    public event Action<SessionID>? OnLogoutEvent;
+    public event Func<Message, SessionID, Task>? OnAppMessageReceived;
 
-    public FixSessionManager(ILogger<FixSessionManager> logger)
+    public FixMessageHandler(ILogger<FixMessageHandler> logger)
     {
         _logger = logger;
     }
 
-    public async Task ConfigureSessionAsync(CancellationToken cancellationToken)
+    public void OnCreate(SessionID sessionID)
     {
-        _settings = new SessionSettings("Config/fixconfig.cfg");
+        _logger.LogInformation("[OnCreate] Session created: {0}", sessionID);
+    }
 
-        _handler = new FixMessageHandler(_logger);
-        _handler.OnLogonEvent += OnLogon;
-        _handler.OnLogoutEvent += OnLogout;
-        _handler.OnAppMessageReceived += async (message, sessionId) =>
+    public void OnLogon(SessionID sessionID)
+    {
+        _logger.LogInformation("[OnLogon] Logon: {0}", sessionID);
+        OnLogonEvent?.Invoke(sessionID);
+    }
+
+    public void OnLogout(SessionID sessionID)
+    {
+        _logger.LogInformation("[OnLogout] Logout: {0}", sessionID);
+        OnLogoutEvent?.Invoke(sessionID);
+    }
+
+    public void ToAdmin(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation("[ToAdmin] Sent: {0}", message);
+    }
+
+    public void FromAdmin(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation("[FromAdmin] Received: {0}", message);
+    }
+
+    public void ToApp(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation("[ToApp] Sent: {0}", message);
+    }
+
+    public void FromApp(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation("[FromApp] Received: {0}", message);
+
+        if (OnAppMessageReceived != null)
         {
-            _logger.LogInformation("Dispatching received application message.");
-            if (MessageReceived != null)
-                await MessageReceived.Invoke(message, sessionId);
-        };
-
-        var storeFactory = new FileStoreFactory(_settings);
-        var logFactory = new FileLogFactory(_settings);
-        var messageFactory = new DefaultMessageFactory();
-
-        _initiator = new SocketInitiator(_handler, storeFactory, _settings, logFactory, messageFactory);
-
-        // Assume single session
-        var sessionIds = _settings.GetSessions();
-        if (sessionIds.Count > 0)
-        {
-            _sessionID = sessionIds[0];
+            _ = OnAppMessageReceived.Invoke(message, sessionID);
         }
-        else
-        {
-            _logger.LogError("No session found in config.");
-            throw new InvalidOperationException("SessionID not found.");
-        }
-
-        _logger.LogInformation("Session configured.");
-    }
-
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        _initiator?.Start();
-        _logger.LogInformation("FIX session started.");
-        await Task.CompletedTask;
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        _initiator?.Stop();
-        _logger.LogInformation("FIX session stopped.");
-        await Task.CompletedTask;
-    }
-
-    public async Task SendMessageAsync(Message message, CancellationToken cancellationToken)
-    {
-        if (_sessionID == null)
-        {
-            _logger.LogError("Cannot send message: session not configured.");
-            return;
-        }
-
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var session = Session.LookupSession(_sessionID);
-            if (session != null && session.IsLoggedOn && IsSessionReadyToSend(session))
-            {
-                _logger.LogInformation("Sending message: {0}", message.ToString());
-                session.Send(message);
-                return;
-            }
-
-            _logger.LogWarning("Session not ready. Retrying...");
-            await Task.Delay(500, cancellationToken);
-        }
-
-        _logger.LogWarning("Message send was cancelled.");
-    }
-
-    private void OnLogon(SessionID sessionID)
-    {
-        _lastLogonTime = DateTime.UtcNow;
-        _logger.LogInformation("Logon successful: {0}", sessionID);
-    }
-
-    private void OnLogout(SessionID sessionID)
-    {
-        _logger.LogInformation("Logout received: {0}", sessionID);
-    }
-
-    private bool IsSessionReadyToSend(Session session)
-    {
-        // Simples: espera 2 segundos após logon para garantir sincronização de SeqNum
-        return session.IsLoggedOn && (DateTime.UtcNow - _lastLogonTime > TimeSpan.FromSeconds(2));
     }
 }
