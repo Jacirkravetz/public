@@ -1,1 +1,236 @@
-    public bool IsLoggedOn => Session.LookupSession(CurrentSessionID)?.IsLoggedOn ?? false;
+using QuickFix;
+using Microsoft.Extensions.Logging;
+
+namespace FixInitiatorApp.Handlers;
+
+public class FixMessageHandler : IApplication
+{
+    private readonly ILogger<FixMessageHandler> _logger;
+
+    public event Action<Message, SessionID>? MessageReceived;
+
+    public FixMessageHandler(ILogger<FixMessageHandler> logger)
+    {
+        _logger = logger;
+    }
+
+    public void FromApp(Message message, SessionID sessionID)
+    {
+        _logger.LogInformation("Received application message: {Message}", message.ToString());
+        MessageReceived?.Invoke(message, sessionID);
+    }
+
+    public void ToApp(Message message, SessionID sessionID) =>
+        _logger.LogInformation("Sending application message: {Message}", message.ToString());
+
+    public void FromAdmin(Message message, SessionID sessionID) =>
+        _logger.LogInformation("Received admin message: {Message}", message.ToString());
+
+    public void ToAdmin(Message message, SessionID sessionID) =>
+        _logger.LogInformation("Sending admin message: {Message}", message.ToString());
+
+    public void OnCreate(SessionID sessionID) =>
+        _logger.LogInformation("Session created: {Session}", sessionID);
+
+    public void OnLogon(SessionID sessionID) =>
+        _logger.LogInformation("Logon successful: {Session}", sessionID);
+
+    public void OnLogout(SessionID sessionID) =>
+        _logger.LogInformation("Logout: {Session}", sessionID);
+}
+
+using FixInitiatorApp.Handlers;
+using Microsoft.Extensions.Logging;
+using QuickFix;
+
+namespace FixInitiatorApp.Managers;
+
+public class FixSessionManager
+{
+    private readonly IInitiator _initiator;
+    private readonly SessionSettings _settings;
+    private readonly FixMessageHandler _handler;
+    private readonly ILogger<FixSessionManager> _logger;
+
+    private SessionID? _activeSessionId;
+    private bool _isSynchronized = false;
+
+    private CancellationTokenSource? _monitorCts;
+    private Task? _monitorTask;
+
+    public FixSessionManager(ILogger<FixSessionManager> logger, ILogger<FixMessageHandler> handlerLogger)
+    {
+        _logger = logger;
+        _settings = new SessionSettings("Config/fixconfig.cfg");
+
+        _handler = new FixMessageHandler(handlerLogger);
+        _handler.OnLogonEvent += OnLogon;
+        _handler.OnLogoutEvent += OnLogout;
+
+        var storeFactory = new FileStoreFactory(_settings);
+        var logFactory = new FileLogFactory(_settings);
+        var messageFactory = new DefaultMessageFactory();
+
+        _initiator = new SocketInitiator(_handler, storeFactory, _settings, logFactory, messageFactory);
+    }
+
+    public void Start()
+    {
+        _logger.LogInformation("Iniciando FIX Initiator...");
+        _initiator.Start();
+
+        _monitorCts = new CancellationTokenSource();
+        _monitorTask = Task.Run(() => MonitorSessionStatus(_monitorCts.Token));
+    }
+
+    public void Stop()
+    {
+        _logger.LogInformation("Parando FIX Initiator...");
+        _monitorCts?.Cancel();
+        _monitorTask?.Wait();
+
+        _initiator.Stop();
+    }
+
+    private void OnLogon(SessionID sessionID)
+    {
+        _logger.LogInformation("Logon recebido: {Session}", sessionID);
+        _activeSessionId = sessionID;
+        CheckSynchronization();
+    }
+
+    private void OnLogout(SessionID sessionID)
+    {
+        _logger.LogWarning("Logout da sessão: {Session}", sessionID);
+        _activeSessionId = null;
+        _isSynchronized = false;
+    }
+
+    private async Task MonitorSessionStatus(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Monitor de sessão iniciado.");
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (_activeSessionId != null)
+                {
+                    var session = Session.LookupSession(_activeSessionId);
+
+                    if (session != null)
+                    {
+                        if (!session.IsLoggedOn)
+                        {
+                            _logger.LogWarning("Sessão não logada.");
+                        }
+                        else
+                        {
+                            CheckSynchronization();
+                        }
+                    }
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogInformation("Monitoramento cancelado.");
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro no monitoramento da sessão.");
+            }
+        }
+    }
+
+    private void CheckSynchronization()
+    {
+        if (_activeSessionId == null) return;
+
+        var session = Session.LookupSession(_activeSessionId);
+        if (session == null) return;
+
+        var expectedSenderNum = session.ExpectedSenderNum;
+        var nextTargetNum = session.NextTargetMsgSeqNum;
+
+        if (expectedSenderNum == nextTargetNum)
+        {
+            if (!_isSynchronized)
+            {
+                _isSynchronized = true;
+                _logger.LogInformation("Sessão sincronizada. Sender={SenderNum}, Target={TargetNum}",
+                    expectedSenderNum, nextTargetNum);
+            }
+        }
+        else
+        {
+            _logger.LogWarning("Sessão NÃO sincronizada. Sender={SenderNum}, Target={TargetNum}",
+                expectedSenderNum, nextTargetNum);
+            _isSynchronized = false;
+        }
+    }
+
+    public bool IsSessionReady =>
+        _activeSessionId != null &&
+        Session.LookupSession(_activeSessionId)?.IsLoggedOn == true &&
+        _isSynchronized;
+
+    public bool SendMessage(Message message)
+    {
+        if (!IsSessionReady)
+        {
+            _logger.LogWarning("Sessão não está pronta para envio.");
+            return false;
+        }
+
+        var session = Session.LookupSession(_activeSessionId!);
+        if (session == null)
+        {
+            _logger.LogError("Sessão não encontrada.");
+            return false;
+        }
+
+        _logger.LogInformation("Enviando mensagem: {Msg}", message.ToString());
+        return session.Send(message);
+    }
+
+    public FixMessageHandler GetHandler() => _handler;
+}
+
+
+using FixInitiatorApp.Managers;
+using Microsoft.Extensions.Logging;
+using QuickFix;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddConsole()
+                .SetMinimumLevel(LogLevel.Information);
+        });
+
+        var logger = loggerFactory.CreateLogger<FixSessionManager>();
+        var handlerLogger = loggerFactory.CreateLogger<FixMessageHandler>();
+
+        var manager = new FixSessionManager(logger, handlerLogger);
+        var handler = manager.GetHandler();
+
+        handler.MessageReceived += (message, sessionID) =>
+        {
+            Console.WriteLine($"[Program] Nova mensagem recebida: {message}");
+        };
+
+        manager.Start();
+
+        Console.WriteLine("FIX Initiator iniciado. Pressione qualquer tecla para sair.");
+        Console.ReadKey();
+
+        manager.Stop();
+    }
+}
