@@ -1,299 +1,44 @@
-using QuickFix;
-using System.Threading.Tasks;
-
-namespace FixInitiatorApp.Interfaces
+public async Task<bool> SendMessageAsync(Message message, CancellationToken cancellationToken)
 {
-    public interface IFixSessionManager
+    while (!IsSessionReady)
     {
-        void Start();
-        void Stop();
-        bool SendMessage(Message message);
-        bool IsSessionReady { get; }
-        IFixMessageHandler GetHandler();
+        if (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Message sending was canceled before the session was ready.");
+            return false;
+        }
+
+        _logger.LogInformation("Waiting for FIX session to be ready to send message...");
+        await Task.Delay(1000, cancellationToken); // Wait 1 second between checks
     }
 
-    public interface IFixMessageHandler : IApplication
+    var session = Session.LookupSession(_activeSessionId!);
+    if (session != null)
     {
-        event SessionLogonEventHandler OnLogonEvent;
-        event SessionLogoutEventHandler OnLogoutEvent;
+        bool sent = session.Send(message);
+        _logger.LogInformation(sent ? "Message sent successfully." : "Failed to send message.");
+        return sent;
     }
 
-    public delegate void SessionLogonEventHandler(SessionID sessionID);
-    public delegate void SessionLogoutEventHandler(SessionID sessionID);
-}
-
-
-using Microsoft.Extensions.Logging;
-using QuickFix;
-using FixInitiatorApp.Interfaces;
-
-namespace FixInitiatorApp.Handlers
-{
-    public class FixMessageHandler : IFixMessageHandler
-    {
-        private readonly ILogger<FixMessageHandler> _logger;
-
-        public event SessionLogonEventHandler? OnLogonEvent;
-        public event SessionLogoutEventHandler? OnLogoutEvent;
-
-        public FixMessageHandler(ILogger<FixMessageHandler> logger)
-        {
-            _logger = logger;
-        }
-
-        // Called when admin message is sent to target
-        public void ToAdmin(Message message, SessionID sessionID)
-        {
-            _logger.LogDebug("ToAdmin: {Message} Session: {SessionID}", message, sessionID);
-            // Implement Logon message customization here if needed
-        }
-
-        // Called when admin message is received from target
-        public void FromAdmin(Message message, SessionID sessionID)
-        {
-            _logger.LogDebug("FromAdmin: {Message} Session: {SessionID}", message, sessionID);
-            // Could validate Logon here
-        }
-
-        // Called when application message is sent to target
-        public void ToApp(Message message, SessionID sessionID)
-        {
-            _logger.LogInformation("ToApp: {Message} Session: {SessionID}", message, sessionID);
-        }
-
-        // Called when application message is received from target
-        public void FromApp(Message message, SessionID sessionID)
-        {
-            _logger.LogInformation("FromApp: {Message} Session: {SessionID}", message, sessionID);
-
-            // Aqui pode-se adicionar lógica para push da mensagem para outra parte do sistema
-            // Exemplo: evento, fila, callback, etc.
-        }
-
-        public void OnCreate(SessionID sessionID)
-        {
-            _logger.LogInformation("Sessão criada: {SessionID}", sessionID);
-        }
-
-        public void OnLogon(SessionID sessionID)
-        {
-            _logger.LogInformation("Logon efetuado: {SessionID}", sessionID);
-            OnLogonEvent?.Invoke(sessionID);
-        }
-
-        public void OnLogout(SessionID sessionID)
-        {
-            _logger.LogWarning("Logout da sessão: {SessionID}", sessionID);
-            OnLogoutEvent?.Invoke(sessionID);
-        }
-    }
+    _logger.LogError("Active session was not found.");
+    return false;
 }
 
 
 
-using FixInitiatorApp.Handlers;
-using FixInitiatorApp.Interfaces;
-using Microsoft.Extensions.Logging;
-using QuickFix;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace FixInitiatorApp.Managers
+public bool IsSessionReady
 {
-    public class FixSessionManager : IFixSessionManager
+    get
     {
-        private readonly ILogger<FixSessionManager> _logger;
-        private readonly FixMessageHandler _handler;
-        private readonly IInitiator _initiator;
-        private readonly SessionSettings _settings;
+        if (_activeSessionId == null) return false;
 
-        private SessionID? _activeSessionId;
-        private bool _isSynchronized = false;
-
-        private CancellationTokenSource? _monitorCts;
-        private Task? _monitorTask;
-
-        public FixSessionManager(ILogger<FixSessionManager> logger)
-        {
-            _logger = logger;
-
-            _settings = new SessionSettings("Config/fixconfig.cfg");
-
-            _handler = new FixMessageHandler(CreateLogger<FixMessageHandler>());
-            _handler.OnLogonEvent += OnLogon;
-            _handler.OnLogoutEvent += OnLogout;
-
-            var storeFactory = new FileStoreFactory(_settings);
-            var logFactory = new FileLogFactory(_settings);
-            var messageFactory = new DefaultMessageFactory();
-
-            _initiator = new SocketInitiator(_handler, storeFactory, _settings, logFactory, messageFactory);
-        }
-
-        private ILogger<T> CreateLogger<T>()
-        {
-            // Aqui você pode implementar uma maneira de criar um logger para FixMessageHandler,
-            // por exemplo, se estiver usando um container DI, injete ILogger<T> lá.
-            // Como exemplo simples, usa LoggerFactory.
-            using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-            return loggerFactory.CreateLogger<T>();
-        }
-
-        public void Start()
-        {
-            _logger.LogInformation("Iniciando FIX Initiator...");
-            _initiator.Start();
-
-            _monitorCts = new CancellationTokenSource();
-            _monitorTask = Task.Run(() => MonitorSessionStatus(_monitorCts.Token));
-        }
-
-        public void Stop()
-        {
-            _logger.LogInformation("Parando FIX Initiator...");
-            if (_monitorCts != null)
-            {
-                _monitorCts.Cancel();
-                _monitorTask?.Wait();
-            }
-
-            _initiator.Stop();
-        }
-
-        private void OnLogon(SessionID sessionID)
-        {
-            _logger.LogInformation("Logon recebido: {SessionID}", sessionID);
-            _activeSessionId = sessionID;
-            CheckSynchronization();
-        }
-
-        private void OnLogout(SessionID sessionID)
-        {
-            _logger.LogWarning("Logout da sessão: {SessionID}", sessionID);
-            _activeSessionId = null;
-            _isSynchronized = false;
-        }
-
-        private async Task MonitorSessionStatus(CancellationToken cancellationToken)
-        {
-            _logger.LogInformation("Monitor de sessão iniciado.");
-
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                try
-                {
-                    if (_activeSessionId != null)
-                    {
-                        var session = Session.LookupSession(_activeSessionId);
-                        if (session != null)
-                        {
-                            if (!session.IsLoggedOn)
-                            {
-                                _logger.LogWarning("Sessão não está logada.");
-                            }
-                            else
-                            {
-                                CheckSynchronization();
-                            }
-                        }
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
-                }
-                catch (TaskCanceledException)
-                {
-                    _logger.LogInformation("Monitoramento cancelado.");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Erro no monitoramento da sessão.");
-                }
-            }
-        }
-
-        private void CheckSynchronization()
-        {
-            if (_activeSessionId == null) return;
-
-            var session = Session.LookupSession(_activeSessionId);
-            if (session == null) return;
-
-            var expectedSenderNum = session.ExpectedSenderNum;
-            var nextTargetNum = session.NextTargetMsgSeqNum;
-
-            if (expectedSenderNum == nextTargetNum)
-            {
-                if (!_isSynchronized)
-                {
-                    _isSynchronized = true;
-                    _logger.LogInformation("Sessão sincronizada. Sender={SenderNum}, Target={TargetNum}",
-                        expectedSenderNum, nextTargetNum);
-                }
-            }
-            else
-            {
-                _logger.LogWarning("Sessão NÃO sincronizada. Sender={SenderNum}, Target={TargetNum}",
-                    expectedSenderNum, nextTargetNum);
-                _isSynchronized = false;
-            }
-        }
-
-        public bool IsSessionReady =>
-            _activeSessionId != null &&
-            Session.LookupSession(_activeSessionId)?.IsLoggedOn == true &&
-            _isSynchronized;
-
-        public bool SendMessage(Message message)
-        {
-            if (!IsSessionReady)
-            {
-                _logger.LogWarning("Sessão não está pronta para envio.");
-                return false;
-            }
-
-            var session = Session.LookupSession(_activeSessionId!);
-            if (session == null)
-            {
-                _logger.LogError("Sessão não encontrada.");
-                return false;
-            }
-
-            _logger.LogInformation("Enviando mensagem: {Msg}", message);
-            return session.Send(message);
-        }
-
-        public IFixMessageHandler GetHandler() => _handler;
+        var session = Session.LookupSession(_activeSessionId);
+        return session != null && session.IsLoggedOn;
     }
 }
 
 
+Task<bool> SendMessageAsync(Message message, CancellationToken cancellationToken);
+    bool IsSessionReady { get; }
 
-using FixInitiatorApp.Interfaces;
-using FixInitiatorApp.Managers;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using QuickFix;
 
-class Program
-{
-    static async Task Main(string[] args)
-    {
-        // Configurando DI e Logger
-        var serviceCollection = new ServiceCollection();
-        serviceCollection.AddLogging(configure => configure.AddConsole());
-        serviceCollection.AddSingleton<IFixSessionManager, FixSessionManager>();
-
-        var serviceProvider = serviceCollection.BuildServiceProvider();
-        var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
-
-        var fixManager = serviceProvider.GetRequiredService<IFixSessionManager>();
-
-        fixManager.Start();
-
-        logger.LogInformation("Aplicação FIX iniciada. Pressione ENTER para sair...");
-        Console.ReadLine();
-
-        fixManager.Stop();
-    }
-}
