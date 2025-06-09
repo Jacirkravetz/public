@@ -1,18 +1,94 @@
-sessionManager.MessageReceived += (message, sessionID) =>
+public interface IFixSessionManager
 {
-    // Chama o método async, mas não bloqueia o evento
-    _ = HandleMessageAsync(message, sessionID);
-};
+    event Func<Message, SessionID, Task>? MessageReceived;
 
-async Task HandleMessageAsync(Message message, SessionID sessionID)
+    void ConfigureSession();
+    Task StartAsync(CancellationToken cancellationToken);
+    Task SendMessageAsync(Message message, CancellationToken cancellationToken);
+}
+
+
+
+public class FixSessionManager : IFixSessionManager
 {
-    try
+    public event Func<Message, SessionID, Task>? MessageReceived;
+
+    private FixMessageHandler _handler;
+
+    public void ConfigureSession()
     {
-        Console.WriteLine($"Received message from session {sessionID}: {message}");
-        await PushAsync(message, sessionID);
+        _handler = new FixMessageHandler(/*logger*/);
+
+        _handler.MessageReceived += async (message, sessionID) =>
+        {
+            if (MessageReceived != null)
+            {
+                // Invoca todos os subscribers async, aguardando todos terminarem
+                Delegate[] invocationList = MessageReceived.GetInvocationList();
+
+                var tasks = invocationList
+                    .Cast<Func<Message, SessionID, Task>>()
+                    .Select(handler => handler.Invoke(message, sessionID));
+
+                await Task.WhenAll(tasks);
+            }
+        };
+
+        // Configuração do initiator etc...
     }
-    catch (Exception ex)
+
+    // demais métodos...
+}
+
+
+
+public class FixMessageHandler : IApplication
+{
+    public event Func<Message, SessionID, Task>? MessageReceived;
+
+    public void FromApp(Message message, SessionID sessionID)
     {
-        Console.WriteLine($"Error processing message: {ex}");
+        if (MessageReceived != null)
+        {
+            var invocationList = MessageReceived.GetInvocationList();
+
+            var tasks = invocationList
+                .Cast<Func<Message, SessionID, Task>>()
+                .Select(handler => handler.Invoke(message, sessionID));
+
+            Task.WhenAll(tasks).GetAwaiter().GetResult(); // Bloqueia aqui para garantir processamento (ou você pode fazer async, depende do contexto)
+        }
+    }
+
+    // Outros métodos IApplication
+}
+
+
+
+class Program
+{
+    static async Task Main()
+    {
+        IFixSessionManager sessionManager = new FixSessionManager(/*logger*/);
+        sessionManager.ConfigureSession();
+
+        sessionManager.MessageReceived += async (message, sessionID) =>
+        {
+            Console.WriteLine($"Received message from session {sessionID}: {message}");
+            await PushAsync(message, sessionID);
+        };
+
+        await sessionManager.StartAsync(CancellationToken.None);
+
+        // resto do código...
+    }
+
+    static async Task PushAsync(Message message, SessionID sessionID)
+    {
+        // Simula push async para outro sistema
+        await Task.Delay(10);
+        Console.WriteLine("Message pushed!");
     }
 }
+
+
