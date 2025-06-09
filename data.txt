@@ -1,44 +1,21 @@
-public async Task<bool> SendMessageAsync(Message message, CancellationToken cancellationToken)
-{
-    while (!IsSessionReady)
-    {
-        if (cancellationToken.IsCancellationRequested)
+event Action<Message, SessionID>? MessageReceived;
+
+    public event Action<Message, SessionID>? MessageReceived;
+
+
+
+_handler.MessageReceived += (message, sessionID) =>
         {
-            _logger.LogWarning("Message sending was canceled before the session was ready.");
-            return false;
-        }
-
-        _logger.LogInformation("Waiting for FIX session to be ready to send message...");
-        await Task.Delay(1000, cancellationToken); // Wait 1 second between checks
-    }
-
-    var session = Session.LookupSession(_activeSessionId!);
-    if (session != null)
-    {
-        bool sent = session.Send(message);
-        _logger.LogInformation(sent ? "Message sent successfully." : "Failed to send message.");
-        return sent;
-    }
-
-    _logger.LogError("Active session was not found.");
-    return false;
-}
+            MessageReceived?.Invoke(message, sessionID);
+        };
 
 
 
-public bool IsSessionReady
-{
-    get
-    {
-        if (_activeSessionId == null) return false;
+ // Aqui você assina o evento para receber as mensagens
+        sessionManager.MessageReceived += (message, sessionID) =>
+        {
+            Console.WriteLine($"Received message from session {sessionID}: {message}");
+            // Faça o push para outras partes do sistema, tratamento, etc
+        };
 
-        var session = Session.LookupSession(_activeSessionId);
-        return session != null && session.IsLoggedOn;
-    }
-}
-
-
-Task<bool> SendMessageAsync(Message message, CancellationToken cancellationToken);
-    bool IsSessionReady { get; }
-
-
+        await sessionManager.StartAsync(CancellationToken.None);
