@@ -1,97 +1,12 @@
-using QuickFix;
-
-public interface IFixSessionManager
-{
-    Task ConfigureSessionAsync(CancellationToken cancellationToken);
-    Task StartAsync(CancellationToken cancellationToken);
-    Task SendMessageAsync(Message message, CancellationToken cancellationToken);
-    
-    event Func<Message, SessionID, Task>? MessageReceived;
-}
-using QuickFix;
-
-public class FixSessionManager : IFixSessionManager
-{
-    private readonly ILogger<FixSessionManager> _logger;
-    private readonly IFixMessageHandler _handler;
-    private SessionID? _sessionID;
-
-    public event Func<Message, SessionID, Task>? MessageReceived;
-
-    public FixSessionManager(ILogger<FixSessionManager> logger)
-    {
-        _logger = logger;
-        _handler = new FixMessageHandler(logger); // ou via injeção de dependência
-
-        _handler.OnAppMessageReceived += async (message, sessionID) =>
-        {
-            _logger.LogInformation("Forwarding app-level message to upper layers.");
-
-            if (MessageReceived is not null)
-            {
-                await MessageReceived.Invoke(message, sessionID);
-            }
-        };
-
-        _handler.OnLogonEvent += OnLogon;
-        _handler.OnLogoutEvent += OnLogout;
-    }
-
-    // Implementações de ConfigureSessionAsync, StartAsync, SendMessageAsync, etc.
-
-    private void OnLogon(SessionID sessionID)
-    {
-        _logger.LogInformation("Logon event captured in SessionManager.");
-        _sessionID = sessionID;
-    }
-
-    private void OnLogout(SessionID sessionID)
-    {
-        _logger.LogInformation("Logout event captured in SessionManager.");
-    }
-}
-
-
-
-
-using Microsoft.Extensions.Logging;
-using QuickFix;
-
-public class FixService
-{
-    private readonly IFixSessionManager _sessionManager;
-    private readonly ILogger<FixService> _logger;
-
-    public FixService(IFixSessionManager sessionManager, ILogger<FixService> logger)
-    {
-        _sessionManager = sessionManager;
-        _logger = logger;
-
-        // Assinatura do evento MessageReceived
-        _sessionManager.MessageReceived += OnMessageReceivedAsync;
-    }
-
-    public async Task StartAsync()
-    {
-        _logger.LogInformation("Starting FIX session...");
-
-        CancellationTokenSource cts = new();
-        await _sessionManager.ConfigureSessionAsync(cts.Token);
-        await _sessionManager.StartAsync(cts.Token);
-    }
-
-    private async Task OnMessageReceivedAsync(Message message, SessionID sessionID)
-    {
-        _logger.LogInformation($"[FixService] Message received from {sessionID}: {message}");
-
-        // Aqui você pode fazer o push para outro sistema, banco, fila etc.
-        await PushToExternalSystemAsync(message);
-    }
-
-    private async Task PushToExternalSystemAsync(Message message)
-    {
-        // Simula um push assíncrono
-        await Task.Delay(100); // Simulação de operação async
-        _logger.LogInformation($"[FixService] Message pushed: {message.ToString().Trim()}");
-    }
-}
+SELECT 
+    r1.session_id AS blocked_session,
+    r1.blocking_session_id AS blocking_session,
+    r2.status AS blocking_status,
+    t.text AS blocked_query,
+    t2.text AS blocking_query
+FROM sys.dm_exec_requests r1
+LEFT JOIN sys.dm_exec_requests r2
+    ON r1.blocking_session_id = r2.session_id
+OUTER APPLY sys.dm_exec_sql_text(r1.sql_handle) AS t
+OUTER APPLY sys.dm_exec_sql_text(r2.sql_handle) AS t2
+WHERE r1.blocking_session_id <> 0;
