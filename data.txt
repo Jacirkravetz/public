@@ -1,12 +1,5 @@
-SELECT 
-    r1.session_id AS blocked_session,
-    r1.blocking_session_id AS blocking_session,
-    r2.status AS blocking_status,
-    t.text AS blocked_query,
-    t2.text AS blocking_query
-FROM sys.dm_exec_requests r1
-LEFT JOIN sys.dm_exec_requests r2
-    ON r1.blocking_session_id = r2.session_id
-OUTER APPLY sys.dm_exec_sql_text(r1.sql_handle) AS t
-OUTER APPLY sys.dm_exec_sql_text(r2.sql_handle) AS t2
-WHERE r1.blocking_session_id <> 0;
+SELECT TOP 1 DATEADD(DAY, v.number, CAST(GETDATE() AS DATE)) AS DataAleatoria
+FROM master..spt_values v
+WHERE v.type = 'P' AND v.number BETWEEN 0 AND 14
+  AND DATEPART(WEEKDAY, DATEADD(DAY, v.number, GETDATE())) BETWEEN 2 AND 6
+ORDER BY NEWID();
