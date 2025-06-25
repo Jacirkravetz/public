@@ -1,12 +1,20 @@
-public static bool IsWithinCutoff(CutOffWindow window, bool isHoliday)
+public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
 {
     var now = DateTime.Now;
-    if ((DayOfWeek)now.DayOfWeek != window.DayOfWeek)
-        return false;
+    var currentDay = now.DayOfWeek;
+    var currentTime = now.TimeOfDay;
 
-    if (window.ExcludeHolidays && isHoliday)
-        return false;
+    foreach (var window in windows)
+    {
+        if (window.DayOfWeek != currentDay)
+            continue;
 
-    var time = now.TimeOfDay;
-    return time >= window.StartTime && time <= window.EndTime;
+        if (window.ExcludeHolidays && isHoliday)
+            continue;
+
+        if (currentTime >= window.StartTime && currentTime <= window.EndTime)
+            return true;
+    }
+
+    return false;
 }
