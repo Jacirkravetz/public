@@ -1,6 +1,87 @@
 using FluentValidation;
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
+
+public class CutOffWindowValidator : AbstractValidator<CutOffWindow>
+{
+    public CutOffWindowValidator()
+    {
+        RuleFor(x => x.StepId)
+            .NotEmpty()
+            .WithMessage("StepId is required.");
+
+        RuleFor(x => x.DayOfWeek)
+            .IsInEnum()
+            .WithMessage("DayOfWeek must be a valid day of the week.");
+
+        RuleFor(x => x.StartTime)
+            .NotEmpty()
+            .WithMessage("StartTime is required.");
+
+        RuleFor(x => x.EndTime)
+            .NotEmpty()
+            .WithMessage("EndTime is required.");
+
+        RuleFor(x => x)
+            .Must(x => x.StartTime < x.EndTime)
+            .WithMessage("StartTime must be earlier than EndTime.");
+
+        RuleFor(x => x.TimeZoneId)
+            .NotEmpty()
+            .WithMessage("TimeZoneId is required.")
+            .Must(BeAValidTimeZone)
+            .WithMessage("TimeZoneId is not valid or not supported on this platform.");
+    }
+
+    private bool BeAValidTimeZone(string timeZoneId)
+    {
+        // First try: try to load it directly
+        if (TryLoadTimeZone(timeZoneId, out _))
+            return true;
+
+        // Second try: attempt to convert between IANA and Windows formats
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // On Windows, try to convert IANA → Windows
+            if (TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var windowsId))
+                return TryLoadTimeZone(windowsId, out _);
+        }
+        else
+        {
+            // On Linux/macOS, try to convert Windows → IANA
+            if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
+                return TryLoadTimeZone(ianaId, out _);
+        }
+
+        return false;
+    }
+
+    private bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
+    {
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            tz = null;
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            tz = null;
+            return false;
+        }
+    }
+}
+
+
+
+using FluentValidation;
+using System;
+using System.Linq;
 
 public class CutOffWindowValidator : AbstractValidator<CutOffWindow>
 {
