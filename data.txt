@@ -1,38 +1,52 @@
-using System;
-using System.Linq;
-using System.Text;
-
-public static class CutOffEvaluator
+public string TimeZoneId { get; set; } // Example: "Central European Standard Time"
+public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
 {
-    public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
+    foreach (var window in windows)
     {
-        var now = DateTime.Now;
-        var currentDay = now.DayOfWeek;
-        var currentTime = now.TimeOfDay;
-
-        foreach (var window in windows)
+        // Get the timezone info from the configured ID
+        TimeZoneInfo timeZone;
+        try
         {
-            if (window.DayOfWeek != currentDay)
-                continue;
-
-            if (window.ExcludeHolidays && isHoliday)
-                continue;
-
-            if (currentTime >= window.StartTime && currentTime <= window.EndTime)
-                return true;
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(window.TimeZoneId);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            Console.WriteLine($"⚠️ Time zone not found: {window.TimeZoneId}");
+            continue;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            Console.WriteLine($"⚠️ Invalid time zone: {window.TimeZoneId}");
+            continue;
         }
 
-        // Out of all cutoff windows → log it
-        var sb = new StringBuilder();
-        sb.AppendLine("❌ Outside of Cut-Off Window.");
-        sb.AppendLine("🕒 Configured Cut-Off Windows:");
+        // Convert UTC to the window's local time
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+        var localDay = localTime.DayOfWeek;
+        var localTimeOfDay = localTime.TimeOfDay;
 
-        foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
-        {
-            sb.AppendLine($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (Exclude holidays: {(w.ExcludeHolidays ? "Yes" : "No")})");
-        }
+        if (window.DayOfWeek != localDay)
+            continue;
 
-        Console.WriteLine(sb.ToString());
-        return false;
+        if (window.ExcludeHolidays && isHoliday)
+            continue;
+
+        if (localTimeOfDay >= window.StartTime && localTimeOfDay <= window.EndTime)
+            return true;
     }
+
+    // Log all configured windows if none matched
+    var sb = new StringBuilder();
+    sb.AppendLine("❌ Outside of all Cut-Off Windows.");
+    sb.AppendLine("🕒 Configured Cut-Off Windows:");
+
+    foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+    {
+        sb.AppendLine($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} " +
+                      $"(Exclude holidays: {(w.ExcludeHolidays ? "Yes" : "No")}, " +
+                      $"TimeZone: {w.TimeZoneId})");
+    }
+
+    Console.WriteLine(sb.ToString());
+    return false;
 }
