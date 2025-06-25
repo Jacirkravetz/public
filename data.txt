@@ -1,6 +1,14 @@
-WITH Numeros AS (
-    SELECT TOP 10 ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
-    FROM sys.all_objects
-)
-SELECT CAST(RAND(CHECKSUM(NEWID())) * (100000000 - 100000) + 100000 AS BIGINT) AS NumeroAleatorio
-FROM Numeros;
+using System;
+
+public class CutOffWindow
+{
+    public Guid Id { get; set; }                      // Chave primária
+    public Guid StepId { get; set; }                  // FK para o Step do tipo "CutOffControl"
+
+    public DayOfWeek DayOfWeek { get; set; }          // 0 = Domingo, 6 = Sábado
+
+    public TimeSpan StartTime { get; set; }           // Ex: 08:00
+    public TimeSpan EndTime { get; set; }             // Ex: 12:00
+
+    public bool ExcludeHolidays { get; set; }         // Se deve ignorar feriados
+}
