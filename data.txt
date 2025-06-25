@@ -1,178 +1,85 @@
-using FluentValidation;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 
-public class CutOffWindowValidator : AbstractValidator<CutOffWindow>
+public static class CutOffEvaluator
 {
-    public CutOffWindowValidator()
+    public static bool IsWithinCutoff(IEnumerable<CutOffWindow> windows)
     {
-        RuleFor(x => x.StepId)
-            .NotEmpty()
-            .WithMessage("StepId is required.");
-
-        RuleFor(x => x.DayOfWeek)
-            .IsInEnum()
-            .WithMessage("DayOfWeek must be a valid day of the week.");
-
-        RuleFor(x => x.StartTime)
-            .NotEmpty()
-            .WithMessage("StartTime is required.");
-
-        RuleFor(x => x.EndTime)
-            .NotEmpty()
-            .WithMessage("EndTime is required.");
-
-        RuleFor(x => x)
-            .Must(x => x.StartTime < x.EndTime)
-            .WithMessage("StartTime must be earlier than EndTime.");
-
-        RuleFor(x => x.TimeZoneId)
-            .NotEmpty()
-            .WithMessage("TimeZoneId is required.")
-            .Must(BeAValidTimeZone)
-            .WithMessage("TimeZoneId is not valid or not supported on this platform.");
-    }
-
-    private bool BeAValidTimeZone(string timeZoneId)
-    {
-        // First try: try to load it directly
-        if (TryLoadTimeZone(timeZoneId, out _))
-            return true;
-
-        // Second try: attempt to convert between IANA and Windows formats
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        foreach (var window in windows)
         {
-            // On Windows, try to convert IANA → Windows
-            if (TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var windowsId))
-                return TryLoadTimeZone(windowsId, out _);
-        }
-        else
-        {
-            // On Linux/macOS, try to convert Windows → IANA
-            if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
-                return TryLoadTimeZone(ianaId, out _);
+            if (!TryLoadTimeZone(window.TimeZoneId, out var timeZoneInfo))
+            {
+                Console.WriteLine($"⚠️ Invalid TimeZoneId: '{window.TimeZoneId}'");
+                continue;
+            }
+
+            // Convert current UTC time to the target timezone
+            var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZoneInfo);
+            var localDay = localTime.DayOfWeek;
+            var localTimeOfDay = localTime.TimeOfDay;
+
+            if (window.DayOfWeek != localDay)
+                continue;
+
+            if (localTimeOfDay >= window.StartTime && localTimeOfDay <= window.EndTime)
+                return true;
         }
 
+        // If no match found, log the configured windows
+        var sb = new StringBuilder();
+        sb.AppendLine("❌ Outside of all Cut-Off Windows.");
+        sb.AppendLine("🕒 Configured Cut-Off Windows:");
+
+        foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+        {
+            sb.AppendLine($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TimeZone: {w.TimeZoneId})");
+        }
+
+        Console.WriteLine(sb.ToString());
         return false;
     }
 
-    private bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
+    private static bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
     {
+        // Try loading directly
         try
         {
             tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
             return true;
         }
-        catch (TimeZoneNotFoundException)
+        catch (TimeZoneNotFoundException) { }
+        catch (InvalidTimeZoneException) { }
+
+        // Try cross-platform conversion
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            tz = null;
-            return false;
+            if (TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var winId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(winId);
+                    return true;
+                }
+                catch { }
+            }
         }
-        catch (InvalidTimeZoneException)
+        else
         {
-            tz = null;
-            return false;
-        }
-    }
-}
-
-
-
-using FluentValidation;
-using System;
-using System.Linq;
-
-public class CutOffWindowValidator : AbstractValidator<CutOffWindow>
-{
-    public CutOffWindowValidator()
-    {
-        RuleFor(x => x.StepId)
-            .NotEmpty()
-            .WithMessage("StepId is required.");
-
-        RuleFor(x => x.DayOfWeek)
-            .IsInEnum()
-            .WithMessage("DayOfWeek must be a valid day (0 = Sunday to 6 = Saturday).");
-
-        RuleFor(x => x.StartTime)
-            .NotEmpty()
-            .WithMessage("StartTime is required.");
-
-        RuleFor(x => x.EndTime)
-            .NotEmpty()
-            .WithMessage("EndTime is required.");
-
-        RuleFor(x => x)
-            .Must(x => x.StartTime < x.EndTime)
-            .WithMessage("StartTime must be earlier than EndTime.");
-
-        RuleFor(x => x.TimeZoneId)
-            .NotEmpty()
-            .WithMessage("TimeZoneId is required.")
-            .Must(BeAValidTimeZone)
-            .WithMessage("TimeZoneId is not a recognized system time zone.");
-    }
-
-    private bool BeAValidTimeZone(string timeZoneId)
-    {
-        return TimeZoneInfo.GetSystemTimeZones()
-            .Any(tz => string.Equals(tz.Id, timeZoneId, StringComparison.OrdinalIgnoreCase));
-    }
-}
-
-
-
-
-public string TimeZoneId { get; set; } // Example: "Central European Standard Time"
-public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
-{
-    foreach (var window in windows)
-    {
-        // Get the timezone info from the configured ID
-        TimeZoneInfo timeZone;
-        try
-        {
-            timeZone = TimeZoneInfo.FindSystemTimeZoneById(window.TimeZoneId);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            Console.WriteLine($"⚠️ Time zone not found: {window.TimeZoneId}");
-            continue;
-        }
-        catch (InvalidTimeZoneException)
-        {
-            Console.WriteLine($"⚠️ Invalid time zone: {window.TimeZoneId}");
-            continue;
+            if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(ianaId);
+                    return true;
+                }
+                catch { }
+            }
         }
 
-        // Convert UTC to the window's local time
-        var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
-        var localDay = localTime.DayOfWeek;
-        var localTimeOfDay = localTime.TimeOfDay;
-
-        if (window.DayOfWeek != localDay)
-            continue;
-
-        if (window.ExcludeHolidays && isHoliday)
-            continue;
-
-        if (localTimeOfDay >= window.StartTime && localTimeOfDay <= window.EndTime)
-            return true;
+        tz = null;
+        return false;
     }
-
-    // Log all configured windows if none matched
-    var sb = new StringBuilder();
-    sb.AppendLine("❌ Outside of all Cut-Off Windows.");
-    sb.AppendLine("🕒 Configured Cut-Off Windows:");
-
-    foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
-    {
-        sb.AppendLine($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} " +
-                      $"(Exclude holidays: {(w.ExcludeHolidays ? "Yes" : "No")}, " +
-                      $"TimeZone: {w.TimeZoneId})");
-    }
-
-    Console.WriteLine(sb.ToString());
-    return false;
 }
