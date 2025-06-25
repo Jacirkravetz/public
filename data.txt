@@ -1,14 +1,12 @@
-using System;
-
-public class CutOffWindow
+public static bool IsWithinCutoff(CutOffWindow window, bool isHoliday)
 {
-    public Guid Id { get; set; }                      // Chave primária
-    public Guid StepId { get; set; }                  // FK para o Step do tipo "CutOffControl"
+    var now = DateTime.Now;
+    if ((DayOfWeek)now.DayOfWeek != window.DayOfWeek)
+        return false;
 
-    public DayOfWeek DayOfWeek { get; set; }          // 0 = Domingo, 6 = Sábado
+    if (window.ExcludeHolidays && isHoliday)
+        return false;
 
-    public TimeSpan StartTime { get; set; }           // Ex: 08:00
-    public TimeSpan EndTime { get; set; }             // Ex: 12:00
-
-    public bool ExcludeHolidays { get; set; }         // Se deve ignorar feriados
+    var time = now.TimeOfDay;
+    return time >= window.StartTime && time <= window.EndTime;
 }
