@@ -1,3 +1,48 @@
+using FluentValidation;
+using System;
+using System.Linq;
+
+public class CutOffWindowValidator : AbstractValidator<CutOffWindow>
+{
+    public CutOffWindowValidator()
+    {
+        RuleFor(x => x.StepId)
+            .NotEmpty()
+            .WithMessage("StepId is required.");
+
+        RuleFor(x => x.DayOfWeek)
+            .IsInEnum()
+            .WithMessage("DayOfWeek must be a valid day (0 = Sunday to 6 = Saturday).");
+
+        RuleFor(x => x.StartTime)
+            .NotEmpty()
+            .WithMessage("StartTime is required.");
+
+        RuleFor(x => x.EndTime)
+            .NotEmpty()
+            .WithMessage("EndTime is required.");
+
+        RuleFor(x => x)
+            .Must(x => x.StartTime < x.EndTime)
+            .WithMessage("StartTime must be earlier than EndTime.");
+
+        RuleFor(x => x.TimeZoneId)
+            .NotEmpty()
+            .WithMessage("TimeZoneId is required.")
+            .Must(BeAValidTimeZone)
+            .WithMessage("TimeZoneId is not a recognized system time zone.");
+    }
+
+    private bool BeAValidTimeZone(string timeZoneId)
+    {
+        return TimeZoneInfo.GetSystemTimeZones()
+            .Any(tz => string.Equals(tz.Id, timeZoneId, StringComparison.OrdinalIgnoreCase));
+    }
+}
+
+
+
+
 public string TimeZoneId { get; set; } // Example: "Central European Standard Time"
 public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
 {
