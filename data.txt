@@ -1,20 +1,38 @@
-public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
+using System;
+using System.Linq;
+using System.Text;
+
+public static class CutOffEvaluator
 {
-    var now = DateTime.Now;
-    var currentDay = now.DayOfWeek;
-    var currentTime = now.TimeOfDay;
-
-    foreach (var window in windows)
+    public static bool IsWithinCutoff(CutOffWindow[] windows, bool isHoliday)
     {
-        if (window.DayOfWeek != currentDay)
-            continue;
+        var now = DateTime.Now;
+        var currentDay = now.DayOfWeek;
+        var currentTime = now.TimeOfDay;
 
-        if (window.ExcludeHolidays && isHoliday)
-            continue;
+        foreach (var window in windows)
+        {
+            if (window.DayOfWeek != currentDay)
+                continue;
 
-        if (currentTime >= window.StartTime && currentTime <= window.EndTime)
-            return true;
+            if (window.ExcludeHolidays && isHoliday)
+                continue;
+
+            if (currentTime >= window.StartTime && currentTime <= window.EndTime)
+                return true;
+        }
+
+        // Out of all cutoff windows → log it
+        var sb = new StringBuilder();
+        sb.AppendLine("❌ Outside of Cut-Off Window.");
+        sb.AppendLine("🕒 Configured Cut-Off Windows:");
+
+        foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+        {
+            sb.AppendLine($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (Exclude holidays: {(w.ExcludeHolidays ? "Yes" : "No")})");
+        }
+
+        Console.WriteLine(sb.ToString());
+        return false;
     }
-
-    return false;
 }
