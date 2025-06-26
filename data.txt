@@ -1,4 +1,5 @@
-SELECT TOP 1 DATEADD(DAY, v.number, CAST(GETDATE() AS DATE)) AS DataAleatoria
+SELECT TOP 1 
+  FORMAT(DATEADD(DAY, v.number, GETDATE()), 'MM/dd/yyyy hh:mm:ss tt') AS DataAleatoria
 FROM master..spt_values v
 WHERE v.type = 'P' AND v.number BETWEEN 0 AND 14
   AND DATEPART(WEEKDAY, DATEADD(DAY, v.number, GETDATE())) BETWEEN 2 AND 6
