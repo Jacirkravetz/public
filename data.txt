@@ -6,14 +6,18 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-public static class CutOffEvaluator
+public class CutOffEvaluator
 {
-    private static readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    public CutOffEvaluator()
+    {
+    }
 
     /// <summary>
     /// Aguarda até que o sistema entre em uma janela válida de Cut-Off.
     /// </summary>
-    public static async Task WaitUntilWithinCutoffAsync(
+    public async Task WaitUntilWithinCutoffAsync(
         IEnumerable<CutOffWindow> windows,
         DateTime? localTradeTimeField,
         TimeSpan? localTradeLimitTime,
@@ -24,6 +28,7 @@ public static class CutOffEvaluator
         while (!cancellationToken.IsCancellationRequested)
         {
             await _semaphore.WaitAsync(cancellationToken);
+
             try
             {
                 if (IsWithinCutoff(windows, localTradeTimeField, localTradeLimitTime, out var matched))
@@ -48,7 +53,7 @@ public static class CutOffEvaluator
     /// <summary>
     /// Verifica se está dentro de alguma janela válida de Cut-Off.
     /// </summary>
-    public static bool IsWithinCutoff(
+    public bool IsWithinCutoff(
         IEnumerable<CutOffWindow> windows,
         DateTime? localTradeTimeField,
         TimeSpan? localTradeLimitTime,
@@ -96,7 +101,7 @@ public static class CutOffEvaluator
         return false;
     }
 
-    public static bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
+    public bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
     {
         try
         {
@@ -130,7 +135,7 @@ public static class CutOffEvaluator
         return false;
     }
 
-    private static void LogAvailableWindows(IEnumerable<CutOffWindow> windows)
+    private void LogAvailableWindows(IEnumerable<CutOffWindow> windows)
     {
         var sb = new StringBuilder();
         sb.AppendLine("🕒 Available Cut-Off Windows:");
@@ -143,7 +148,7 @@ public static class CutOffEvaluator
         Console.WriteLine(sb.ToString());
     }
 
-    private static string FormatWindow(CutOffWindow w) =>
+    private string FormatWindow(CutOffWindow w) =>
         $"{w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TZ: {w.TimeZoneId})";
 }
 
