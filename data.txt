@@ -1,20 +1,172 @@
-private static string GetDayOfWeekDescriptions()
+✅ Teste 1: Trade dentro da janela e antes do horário limite
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Accept_Trade_Inside_Window_And_Before_TradeLimit()
 {
-    return string.Join(", ",
-        Enum.GetValues(typeof(DayOfWeek))
-            .Cast<DayOfWeek>()
-            .Select(d => $"{(int)d} ({d})"));
+    var now = DateTime.UtcNow;
+    var tradeTime = now.Date.AddHours(8); // 08:00 trade
+    var limitTime = TimeSpan.FromHours(9); // limite é 09:00
+
+    var window = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
+        now.TimeOfDay.Add(TimeSpan.FromMinutes(1)));
+
+    window.LocalTradeLimitTime = limitTime;
+    window.LocalTradeLimitTimeField = tradeTime;
+
+    var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, limitTime, out var matched);
+
+    result.Should().BeTrue();
+    matched.Should().NotBeNull();
 }
-RuleFor(x => x.DayOfWeek)
-    .Must(day => Enum.IsDefined(typeof(DayOfWeek), day))
-    .WithMessage($"DayOfWeek must be one of: {GetDayOfWeekDescriptions()}");
+✅ Teste 2: Trade dentro da janela, mas após o horário limite
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Reject_Trade_Inside_Window_And_After_TradeLimit()
+{
+    var now = DateTime.UtcNow;
+    var tradeTime = now.Date.AddHours(10); // 10:00 trade
+    var limitTime = TimeSpan.FromHours(9); // limite é 09:00
 
+    var window = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
+        now.TimeOfDay.Add(TimeSpan.FromMinutes(1)));
 
+    window.LocalTradeLimitTime = limitTime;
+    window.LocalTradeLimitTimeField = tradeTime;
 
- RuleFor(x => x.StartTime)
-            .LessThan(x => x.EndTime)
-            .WithMessage("StartTime must be earlier than EndTime.");
+    var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, limitTime, out var matched);
 
-        RuleFor(x => x.EndTime)
-            .GreaterThan(x => x.StartTime)
-            .WithMessage("EndTime must be later than StartTime.");
+    result.Should().BeFalse();
+    matched.Should().BeNull();
+}
+✅ Teste 3: Trade dentro da janela e sem horário limite definido
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Accept_Trade_If_TradeLimit_Is_Null()
+{
+    var now = DateTime.UtcNow;
+    var tradeTime = now.Date.AddHours(12); // 12:00
+
+    var window = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
+        now.TimeOfDay.Add(TimeSpan.FromMinutes(1)));
+
+    window.LocalTradeLimitTime = null;
+    window.LocalTradeLimitTimeField = tradeTime;
+
+    var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, null, out var matched);
+
+    result.Should().BeTrue();
+    matched.Should().NotBeNull();
+}
+✅ Teste 4: Trade fora da janela de horário, mas dentro do limite de trade → deve ser rejeitado
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Reject_Trade_Outside_Window_Even_If_Before_TradeLimit()
+{
+    var now = DateTime.UtcNow;
+    var tradeTime = now.Date.AddHours(8); // 08:00
+    var limitTime = TimeSpan.FromHours(9);
+
+    var window = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.AddMinutes(10), // começa no futuro
+        now.TimeOfDay.AddMinutes(20));
+
+    window.LocalTradeLimitTime = limitTime;
+    window.LocalTradeLimitTimeField = tradeTime;
+
+    var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, limitTime, out var matched);
+
+    result.Should().BeFalse();
+    matched.Should().BeNull();
+}
+✅ Teste 5: Trade com horário nulo → deve ser aceito se dentro da janela
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Accept_If_TradeTime_Is_Null_And_Inside_Window()
+{
+    var now = DateTime.UtcNow;
+
+    var window = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
+        now.TimeOfDay.Add(TimeSpan.FromMinutes(1)));
+
+    var result = _evaluator.IsWithinCutoff(new[] { window }, null, null, out var matched);
+
+    result.Should().BeTrue();
+    matched.Should().NotBeNull();
+}
+✅ Teste 6: Dia da semana incorreto → sempre rejeita
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Reject_If_DayOfWeek_Does_Not_Match()
+{
+    var today = DateTime.UtcNow.DayOfWeek;
+    var wrongDay = today == DayOfWeek.Monday ? DayOfWeek.Tuesday : DayOfWeek.Monday;
+
+    var window = CreateWindow(wrongDay, TimeSpan.FromHours(8), TimeSpan.FromHours(18));
+
+    var result = _evaluator.IsWithinCutoff(new[] { window }, null, null, out var matched);
+
+    result.Should().BeFalse();
+    matched.Should().BeNull();
+}
+✅ Teste 7: Múltiplas janelas → deve aceitar se pelo menos uma for válida
+csharp
+Copiar
+Editar
+[Test]
+public void Should_Accept_If_Any_Window_Matches()
+{
+    var now = DateTime.UtcNow;
+
+    var window1 = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.AddHours(1), // futura
+        now.TimeOfDay.AddHours(2));
+
+    var window2 = CreateWindow(now.DayOfWeek,
+        now.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
+        now.TimeOfDay.Add(TimeSpan.FromMinutes(1))); // atual
+
+    var result = _evaluator.IsWithinCutoff(new[] { window1, window2 }, null, null, out var matched);
+
+    result.Should().BeTrue();
+    matched.Should().NotBeNull();
+}
+✅ Método auxiliar CreateWindow:
+csharp
+Copiar
+Editar
+private CutOffWindow CreateWindow(DayOfWeek day, TimeSpan start, TimeSpan end, string tz = "UTC")
+{
+    return new CutOffWindow
+    {
+        StepId = Guid.NewGuid(),
+        DayOfWeek = day,
+        StartTime = start,
+        EndTime = end,
+        TimeZoneId = tz
+    };
+}
+✅ Resultado: o que está testado?
+Cenário	Coberto
+Janela válida, dentro do horário e antes do limite	✅
+Dentro da janela, após o limite de corte	✅
+Dentro da janela, limite de corte nulo	✅
+Fora da janela, antes do limite → não entra	✅
+Dia da semana errado	✅
+Trade sem horário → ainda assim funciona dentro da janela	✅
+Múltiplas janelas → aceita se uma estiver válida	✅
