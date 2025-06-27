@@ -1,166 +1,152 @@
 using System;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentAssertions;
-using NUnit.Framework;
+using Microsoft.Extensions.Logging;
 
-[TestFixture]
-public class CutOffEvaluatorTests
+public class ProcessCutOffWindowService : StepBase
 {
-    private CutOffEvaluator _evaluator;
+    private readonly ILogger<ProcessCutOffWindowService> _logger;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    [SetUp]
-    public void Setup()
+    public ProcessCutOffWindowService(ILogger<ProcessCutOffWindowService> logger)
     {
-        _evaluator = new CutOffEvaluator();
+        _logger = logger;
     }
 
-    private CutOffWindow CreateCutOffWindow(string timeZoneId, DayOfWeek day, TimeSpan start, TimeSpan end,
-                                            DateTime? tradeTime = null, TimeSpan? limitTime = null)
+    public async Task ExecuteStepAsync(TabularMessage input, CutOffWindow[] windows, CancellationToken cancellationToken)
     {
-        return new CutOffWindow
+        var tradeDateTime = ExtractTradeDateTime(input);
+        var tradeLimitTime = ExtractTradeLimitTime(input);
+
+        _logger.LogInformation("🔍 Validating CutOff for Step...");
+
+        var isValid = IsWithinCutoff(windows, tradeDateTime, tradeLimitTime, out var matchedWindow);
+
+        if (isValid)
         {
-            StepId = Guid.NewGuid(),
-            DayOfWeek = day,
-            StartTime = start,
-            EndTime = end,
-            TimeZoneId = timeZoneId,
-            LocalTradeLimitTime = limitTime,
-            LocalTradeLimitTimeField = tradeTime
-        };
-    }
-
-    [TestCase("UTC")]
-    [TestCase("America/Sao_Paulo")]
-    [TestCase("Central European Standard Time")]
-    public void Should_Accept_Trade_Inside_Window_And_Before_Limit(string timeZone)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
-
-        var tradeTime = nowLocal.Date.AddHours(8);
-        var limitTime = TimeSpan.FromHours(9);
-
-        var window = CreateCutOffWindow(
-            timeZone,
-            nowLocal.DayOfWeek,
-            nowLocal.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
-            nowLocal.TimeOfDay.Add(TimeSpan.FromMinutes(1)),
-            tradeTime,
-            limitTime
-        );
-
-        var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, limitTime, out var matched);
-
-        result.Should().BeTrue();
-        matched.Should().NotBeNull();
-    }
-
-    [TestCase("UTC")]
-    [TestCase("America/Sao_Paulo")]
-    [TestCase("Central European Standard Time")]
-    public void Should_Reject_Trade_After_Limit_Even_If_Inside_Window(string timeZone)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
-
-        var tradeTime = nowLocal.Date.AddHours(10);
-        var limitTime = TimeSpan.FromHours(9);
-
-        var window = CreateCutOffWindow(
-            timeZone,
-            nowLocal.DayOfWeek,
-            nowLocal.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
-            nowLocal.TimeOfDay.Add(TimeSpan.FromMinutes(1)),
-            tradeTime,
-            limitTime
-        );
-
-        var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, limitTime, out var matched);
-
-        result.Should().BeFalse();
-        matched.Should().BeNull();
-    }
-
-    [TestCase("UTC")]
-    [TestCase("America/Sao_Paulo")]
-    [TestCase("Central European Standard Time")]
-    public void Should_Reject_If_Outside_Window_Even_If_Trade_Is_Before_Limit(string timeZone)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
-
-        var tradeTime = nowLocal.Date.AddHours(8);
-        var limitTime = TimeSpan.FromHours(9);
-
-        var window = CreateCutOffWindow(
-            timeZone,
-            nowLocal.DayOfWeek,
-            nowLocal.TimeOfDay.AddMinutes(5), // começa no futuro
-            nowLocal.TimeOfDay.AddMinutes(10),
-            tradeTime,
-            limitTime
-        );
-
-        var result = _evaluator.IsWithinCutoff(new[] { window }, tradeTime, limitTime, out var matched);
-
-        result.Should().BeFalse();
-        matched.Should().BeNull();
-    }
-
-    [TestCase("UTC")]
-    [TestCase("America/Sao_Paulo")]
-    [TestCase("Central European Standard Time")]
-    public void Should_Accept_If_TradeTime_Is_Null_And_Inside_Window(string timeZone)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
-
-        var window = CreateCutOffWindow(
-            timeZone,
-            nowLocal.DayOfWeek,
-            nowLocal.TimeOfDay.Subtract(TimeSpan.FromMinutes(1)),
-            nowLocal.TimeOfDay.Add(TimeSpan.FromMinutes(1)),
-            null,
-            null
-        );
-
-        var result = _evaluator.IsWithinCutoff(new[] { window }, null, null, out var matched);
-
-        result.Should().BeTrue();
-        matched.Should().NotBeNull();
-    }
-
-    [TestCase("UTC")]
-    [TestCase("America/Sao_Paulo")]
-    [TestCase("Central European Standard Time")]
-    public void Should_Wait_Until_Window_Is_Valid(string timeZone)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
-
-        var start = nowLocal.TimeOfDay.Add(TimeSpan.FromSeconds(1));
-        var end = start.Add(TimeSpan.FromMinutes(2));
-
-        var window = CreateCutOffWindow(
-            timeZone,
-            nowLocal.DayOfWeek,
-            start,
-            end
-        );
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
-        Func<Task> act = async () =>
+            _logger.LogInformation("✅ Trade is within CutOff window. Executing next step.");
+            await base.Push(input, cancellationToken);
+        }
+        else
         {
-            await _evaluator.WaitUntilWithinCutoffAsync(new[] { window }, null, null, cts.Token);
-        };
+            _logger.LogWarning("⛔ Trade is outside CutOff window. Waiting for valid window...");
+            LogAvailableWindows(windows, tradeDateTime, tradeLimitTime);
 
-        act.Should().NotThrowAsync();
+            await WaitUntilWithinCutoffAsync(windows, tradeDateTime, tradeLimitTime, cancellationToken);
+
+            _logger.LogInformation("✅ Window is now valid. Executing Push.");
+            await base.Push(input, cancellationToken);
+        }
+    }
+
+    private async Task WaitUntilWithinCutoffAsync(CutOffWindow[] windows, DateTime? localTradeTime, TimeSpan? localTradeLimitTime, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                if (IsWithinCutoff(windows, localTradeTime, localTradeLimitTime, out _))
+                {
+                    return;
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken); // Aguarda antes de verificar novamente
+        }
+    }
+
+    private bool IsWithinCutoff(CutOffWindow[] windows, DateTime? localTradeTime, TimeSpan? localTradeLimitTime, out CutOffWindow? matched)
+    {
+        matched = null;
+        var nowUtc = DateTime.UtcNow;
+
+        foreach (var window in windows)
+        {
+            if (!TryLoadTimeZone(window.TimeZoneId, out var tz))
+            {
+                _logger.LogWarning("⚠️ Invalid TimeZoneId: {TimeZoneId}", window.TimeZoneId);
+                continue;
+            }
+
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+            if (window.DayOfWeek != localNow.DayOfWeek)
+                continue;
+
+            var time = localNow.TimeOfDay;
+            if (time < window.StartTime || time > window.EndTime)
+                continue;
+
+            if (localTradeLimitTime.HasValue && localTradeTime.HasValue)
+            {
+                if (localTradeTime.Value.TimeOfDay > localTradeLimitTime.Value)
+                    continue;
+            }
+
+            matched = window;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo timeZone)
+    {
+        timeZone = null!;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void LogAvailableWindows(CutOffWindow[] windows, DateTime? tradeTime, TimeSpan? tradeLimit)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("🕒 Available CutOff Windows:");
+
+        foreach (var window in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+        {
+            sb.AppendLine(FormatWindow(window, tradeTime, tradeLimit));
+        }
+
+        _logger.LogInformation(sb.ToString());
+    }
+
+    private string FormatWindow(CutOffWindow w, DateTime? tradeTime, TimeSpan? tradeLimit)
+    {
+        return $" - StepId: {w.StepId}\n" +
+               $"   TimeZone: {w.TimeZoneId}\n" +
+               $"   DayOfWeek: {w.DayOfWeek} ({(int)w.DayOfWeek})\n" +
+               $"   StartTime: {w.StartTime:hh\\:mm}\n" +
+               $"   EndTime: {w.EndTime:hh\\:mm}\n" +
+               $"   LocalTradeTimeField: {(tradeTime.HasValue ? tradeTime.Value.ToString("HH:mm:ss") : "null")}\n" +
+               $"   LocalTradeLimitTime: {(tradeLimit.HasValue ? tradeLimit.Value.ToString("hh\\:mm") : "null")}";
+    }
+
+    private DateTime? ExtractTradeDateTime(TabularMessage input)
+    {
+        if (input.TryGetValue("TradeDate", out var value) && DateTime.TryParse(value?.ToString(), out var date))
+            return date;
+
+        return null;
+    }
+
+    private TimeSpan? ExtractTradeLimitTime(TabularMessage input)
+    {
+        if (input.TryGetValue("TradeLimit", out var value) && TimeSpan.TryParse(value?.ToString(), out var time))
+            return time;
+
+        return null;
     }
 }
