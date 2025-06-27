@@ -1,6 +1,219 @@
-SELECT TOP 1 
-  FORMAT(DATEADD(DAY, v.number, GETDATE()), 'MM/dd/yyyy hh:mm:ss tt') AS DataAleatoria
-FROM master..spt_values v
-WHERE v.type = 'P' AND v.number BETWEEN 0 AND 14
-  AND DATEPART(WEEKDAY, DATEADD(DAY, v.number, GETDATE())) BETWEEN 2 AND 6
-ORDER BY NEWID();
+// File: Program.cs
+// dotnet run --framework net9.0
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using FluentValidation;
+
+#region Model
+
+public class CutOffWindow
+{
+    public Guid StepId { get; set; }
+    public DayOfWeek DayOfWeek { get; set; }
+    public TimeSpan StartTime { get; set; }
+    public TimeSpan EndTime { get; set; }
+    public string TimeZoneId { get; set; } = "UTC";
+}
+
+#endregion
+
+#region Validator
+
+public class CutOffWindowValidator : AbstractValidator<CutOffWindow>
+{
+    public CutOffWindowValidator()
+    {
+        RuleFor(x => x.StepId)
+            .NotEmpty().WithMessage("StepId is required.");
+
+        RuleFor(x => x.DayOfWeek)
+            .IsInEnum().WithMessage("DayOfWeek must be valid.");
+
+        RuleFor(x => x.StartTime)
+            .NotEmpty().WithMessage("StartTime is required.");
+
+        RuleFor(x => x.EndTime)
+            .NotEmpty().WithMessage("EndTime is required.");
+
+        RuleFor(x => x)
+            .Must(x => x.StartTime < x.EndTime)
+            .WithMessage("StartTime must be before EndTime.");
+
+        RuleFor(x => x.TimeZoneId)
+            .NotEmpty().WithMessage("TimeZoneId is required.")
+            .Must(BeAValidTimeZone)
+            .WithMessage("TimeZoneId is invalid on this system.");
+    }
+
+    private bool BeAValidTimeZone(string timeZoneId)
+    {
+        return CutOffEvaluator.TryLoadTimeZone(timeZoneId, out _);
+    }
+}
+
+#endregion
+
+#region Service
+
+public static class CutOffEvaluator
+{
+    private static readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    public static async Task WaitUntilWithinCutoffAsync(IEnumerable<CutOffWindow> windows, CancellationToken cancellationToken)
+    {
+        Console.WriteLine("🔄 Waiting for valid Cut-Off window...");
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                if (IsWithinCutoff(windows, out var matched))
+                {
+                    Console.WriteLine($"✅ Entered Cut-Off window: {FormatWindow(matched)}");
+                    return;
+                }
+
+                Console.WriteLine("❌ Still outside Cut-Off. Retrying in 30s...");
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+        }
+
+        Console.WriteLine("🛑 Monitoring canceled.");
+    }
+
+    public static bool IsWithinCutoff(IEnumerable<CutOffWindow> windows, out CutOffWindow? matchedWindow)
+    {
+        matchedWindow = null;
+
+        foreach (var window in windows)
+        {
+            if (!TryLoadTimeZone(window.TimeZoneId, out var tz))
+            {
+                Console.WriteLine($"⚠️ Invalid TimeZoneId: {window.TimeZoneId}");
+                continue;
+            }
+
+            var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+            if (window.DayOfWeek != local.DayOfWeek)
+                continue;
+
+            if (local.TimeOfDay >= window.StartTime && local.TimeOfDay <= window.EndTime)
+            {
+                matchedWindow = window;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
+    {
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var winId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(winId);
+                    return true;
+                }
+                catch { }
+            }
+            else if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(ianaId);
+                    return true;
+                }
+                catch { }
+            }
+        }
+
+        tz = null;
+        return false;
+    }
+
+    private static string FormatWindow(CutOffWindow w) =>
+        $"{w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TZ: {w.TimeZoneId})";
+}
+
+#endregion
+
+#region Worker
+
+public class CutOffWorker
+{
+    private readonly IEnumerable<CutOffWindow> _windows;
+
+    public CutOffWorker(IEnumerable<CutOffWindow> windows)
+    {
+        _windows = windows;
+    }
+
+    public async Task RunAsync(CancellationToken cancellationToken)
+    {
+        var validator = new CutOffWindowValidator();
+        foreach (var window in _windows)
+        {
+            var result = validator.Validate(window);
+            if (!result.IsValid)
+            {
+                foreach (var error in result.Errors)
+                    Console.WriteLine($"❌ {error.PropertyName}: {error.ErrorMessage}");
+                return;
+            }
+        }
+
+        await CutOffEvaluator.WaitUntilWithinCutoffAsync(_windows, cancellationToken);
+
+        Console.WriteLine("🚀 Proceeding with integration logic...");
+    }
+}
+
+#endregion
+
+#region Main
+
+var windows = new List<CutOffWindow>
+{
+    new()
+    {
+        StepId = Guid.NewGuid(),
+        DayOfWeek = DateTime.UtcNow.DayOfWeek,
+        StartTime = new TimeSpan(8, 0, 0),
+        EndTime = new TimeSpan(18, 0, 0),
+        TimeZoneId = "America/Sao_Paulo"
+    }
+};
+
+var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (s, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
+
+var worker = new CutOffWorker(windows);
+await worker.RunAsync(cts.Token);
+
+#endregion
