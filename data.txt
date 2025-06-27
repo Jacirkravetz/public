@@ -1,3 +1,154 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+public static class CutOffEvaluator
+{
+    private static readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    /// <summary>
+    /// Aguarda até que o sistema entre em uma janela válida de Cut-Off.
+    /// </summary>
+    public static async Task WaitUntilWithinCutoffAsync(
+        IEnumerable<CutOffWindow> windows,
+        DateTime? localTradeTimeField,
+        TimeSpan? localTradeLimitTime,
+        CancellationToken cancellationToken)
+    {
+        Console.WriteLine("🔄 Waiting for valid Cut-Off window...");
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                if (IsWithinCutoff(windows, localTradeTimeField, localTradeLimitTime, out var matched))
+                {
+                    Console.WriteLine($"✅ Entered Cut-Off window: {FormatWindow(matched)}");
+                    return;
+                }
+
+                Console.WriteLine("❌ Still outside Cut-Off. Retrying in 30s...");
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+        }
+
+        Console.WriteLine("🛑 Monitoring canceled.");
+    }
+
+    /// <summary>
+    /// Verifica se está dentro de alguma janela válida de Cut-Off.
+    /// </summary>
+    public static bool IsWithinCutoff(
+        IEnumerable<CutOffWindow> windows,
+        DateTime? localTradeTimeField,
+        TimeSpan? localTradeLimitTime,
+        out CutOffWindow? matchedWindow)
+    {
+        matchedWindow = null;
+
+        foreach (var window in windows)
+        {
+            if (!TryLoadTimeZone(window.TimeZoneId, out var tz))
+            {
+                Console.WriteLine($"⚠️ Invalid TimeZoneId: {window.TimeZoneId}");
+                continue;
+            }
+
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+            var localDay = now.DayOfWeek;
+            var localTime = now.TimeOfDay;
+
+            // Verifica o dia da semana
+            if (window.DayOfWeek != localDay)
+                continue;
+
+            // Verifica se o horário atual está dentro da janela principal
+            if (localTime < window.StartTime || localTime > window.EndTime)
+                continue;
+
+            // Verifica a hora limite do trade, se fornecido
+            if (localTradeTimeField.HasValue && localTradeLimitTime.HasValue)
+            {
+                var tradeLocalTime = TimeZoneInfo.ConvertTimeFromUtc(localTradeTimeField.Value.ToUniversalTime(), tz).TimeOfDay;
+
+                if (tradeLocalTime > localTradeLimitTime.Value)
+                {
+                    Console.WriteLine($"⛔ Trade time {tradeLocalTime:hh\\:mm} exceeded cutoff limit {localTradeLimitTime.Value:hh\\:mm} in timezone {tz.Id}");
+                    continue;
+                }
+            }
+
+            matchedWindow = window;
+            return true;
+        }
+
+        LogAvailableWindows(windows);
+        return false;
+    }
+
+    public static bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
+    {
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var winId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(winId);
+                    return true;
+                }
+                catch { }
+            }
+            else if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(ianaId);
+                    return true;
+                }
+                catch { }
+            }
+        }
+
+        tz = null;
+        return false;
+    }
+
+    private static void LogAvailableWindows(IEnumerable<CutOffWindow> windows)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("🕒 Available Cut-Off Windows:");
+
+        foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+        {
+            sb.AppendLine($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TZ: {w.TimeZoneId})");
+        }
+
+        Console.WriteLine(sb.ToString());
+    }
+
+    private static string FormatWindow(CutOffWindow w) =>
+        $"{w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TZ: {w.TimeZoneId})";
+}
+
+
+
 // File: Program.cs
 // dotnet run --framework net9.0
 
