@@ -1,3 +1,213 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class CutOffEvaluator
+{
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    public CutOffEvaluator()
+    {
+    }
+
+    /// <summary>
+    /// Aguarda até que o sistema entre em uma janela válida de Cut-Off.
+    /// </summary>
+    public async Task WaitUntilWithinCutoffAsync(
+        IEnumerable<CutOffWindow> windows,
+        DateTime? localTradeTimeField,
+        TimeSpan? localTradeLimitTime,
+        CancellationToken cancellationToken)
+    {
+        Console.WriteLine("🔄 Waiting for valid Cut-Off window...");
+
+        var pushAWasCalled = false;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+            CutOffWindow? matchedWindow = null;
+
+            try
+            {
+                bool isWithinCutoff = IsWithinCutoff(windows, localTradeTimeField, localTradeLimitTime, out matchedWindow);
+
+                if (isWithinCutoff)
+                {
+                    Console.WriteLine($"✅ Entered Cut-Off window: {FormatWindow(matchedWindow!)}");
+
+                    if (!pushAWasCalled)
+                    {
+                        await PushB(); // Dentro da janela
+                        pushAWasCalled = true;
+                    }
+
+                    return;
+                }
+                else
+                {
+                    if (!pushAWasCalled)
+                    {
+                        await PushA(); // Fora da janela
+                        pushAWasCalled = true;
+                    }
+
+                    Console.WriteLine("❌ Still outside Cut-Off. Retrying in 30s...");
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+        }
+
+        Console.WriteLine("🛑 Monitoring canceled.");
+    }
+
+    /// <summary>
+    /// Verifica se o horário atual está dentro de alguma janela válida de Cut-Off.
+    /// </summary>
+    public bool IsWithinCutoff(
+        IEnumerable<CutOffWindow> windows,
+        DateTime? localTradeTimeField,
+        TimeSpan? localTradeLimitTime,
+        out CutOffWindow? matchedWindow)
+    {
+        matchedWindow = null;
+
+        foreach (var window in windows)
+        {
+            if (!TryLoadTimeZone(window.TimeZoneId, out var tz))
+            {
+                Console.WriteLine($"⚠️ Invalid TimeZoneId: {window.TimeZoneId}");
+                continue;
+            }
+
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+            var localDay = now.DayOfWeek;
+            var localTime = now.TimeOfDay;
+
+            // Verifica o dia da semana
+            if (window.DayOfWeek != localDay)
+                continue;
+
+            // Verifica se o horário atual está dentro da janela principal
+            if (localTime < window.StartTime || localTime > window.EndTime)
+                continue;
+
+            // Verifica a hora limite do trade, se fornecido
+            if (localTradeTimeField.HasValue && localTradeLimitTime.HasValue)
+            {
+                var tradeLocalTime = TimeZoneInfo.ConvertTimeFromUtc(localTradeTimeField.Value.ToUniversalTime(), tz).TimeOfDay;
+
+                if (tradeLocalTime > localTradeLimitTime.Value)
+                {
+                    Console.WriteLine($"⛔ Trade time {tradeLocalTime:hh\\:mm} exceeded cutoff limit {localTradeLimitTime.Value:hh\\:mm} in timezone {tz.Id}");
+                    continue;
+                }
+            }
+
+            matchedWindow = window;
+            return true;
+        }
+
+        LogAvailableWindows(windows, localTradeTimeField, localTradeLimitTime);
+        return false;
+    }
+
+    /// <summary>
+    /// Tenta carregar o TimeZone pelo Id, convertendo entre Windows/IANA se necessário.
+    /// </summary>
+    public bool TryLoadTimeZone(string timeZoneId, out TimeZoneInfo? tz)
+    {
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var winId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(winId);
+                    return true;
+                }
+                catch { }
+            }
+            else if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
+            {
+                try
+                {
+                    tz = TimeZoneInfo.FindSystemTimeZoneById(ianaId);
+                    return true;
+                }
+                catch { }
+            }
+        }
+
+        tz = null;
+        return false;
+    }
+
+    private void LogAvailableWindows(IEnumerable<CutOffWindow> windows, DateTime? tradeTime = null, TimeSpan? tradeLimit = null)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("🔎 Available Cut-Off Windows:");
+
+        foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+        {
+            sb.AppendLine(FormatWindow(w, tradeTime, tradeLimit));
+        }
+
+        Console.WriteLine(sb.ToString());
+    }
+
+    private string FormatWindow(CutOffWindow w, DateTime? tradeTime = null, TimeSpan? tradeLimit = null)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TZ: {w.TimeZoneId})");
+
+        if (tradeTime.HasValue)
+        {
+            var localTrade = TryLoadTimeZone(w.TimeZoneId, out var tz)
+                ? TimeZoneInfo.ConvertTimeFromUtc(tradeTime.Value.ToUniversalTime(), tz)
+                : tradeTime.Value;
+
+            sb.Append($" | TradeTime: {localTrade:yyyy-MM-dd HH:mm}");
+        }
+
+        if (tradeLimit.HasValue)
+        {
+            sb.Append($" | TradeLimit: {tradeLimit.Value:hh\\:mm}");
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task PushA()
+    {
+        Console.WriteLine("📤 Push A: OUTSIDE Cut-Off window");
+        await Task.Delay(100); // Simula envio
+    }
+
+    private async Task PushB()
+    {
+        Console.WriteLine("📤 Push B: INSIDE Cut-Off window");
+        await Task.Delay(100); // Simula envio
+    }
+}
+
+
+
 public class CutOffEvaluator
 {
     private readonly object _lockObj = new();
