@@ -1,3 +1,40 @@
+private void LogAvailableWindows(IEnumerable<CutOffWindow> windows, DateTime? localTradeTimeField = null, TimeSpan? localTradeLimitTime = null)
+{
+    var sb = new StringBuilder();
+    sb.AppendLine("🔎 Available Cut-Off Windows:");
+
+    foreach (var w in windows.OrderBy(w => w.DayOfWeek).ThenBy(w => w.StartTime))
+    {
+        sb.AppendLine(FormatWindow(w, localTradeTimeField, localTradeLimitTime));
+    }
+
+    Console.WriteLine(sb.ToString());
+}
+
+private string FormatWindow(CutOffWindow w, DateTime? tradeTime = null, TimeSpan? tradeLimit = null)
+{
+    var sb = new StringBuilder();
+    sb.Append($"- {w.DayOfWeek}: {w.StartTime:hh\\:mm} - {w.EndTime:hh\\:mm} (TZ: {w.TimeZoneId})");
+
+    if (tradeTime.HasValue)
+    {
+        var localTrade = TryLoadTimeZone(w.TimeZoneId, out var tz)
+            ? TimeZoneInfo.ConvertTimeFromUtc(tradeTime.Value.ToUniversalTime(), tz)
+            : tradeTime.Value;
+
+        sb.Append($" | TradeTime: {localTrade:yyyy-MM-dd HH:mm}");
+    }
+
+    if (tradeLimit.HasValue)
+    {
+        sb.Append($" | TradeLimit: {tradeLimit.Value:hh\\:mm}");
+    }
+
+    return sb.ToString();
+}
+
+
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
