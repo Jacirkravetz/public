@@ -1,6 +1,47 @@
-Descrição	ID no Windows	ID no Linux (IANA)
-Horário de Brasília	E. South America Standard Time	America/Sao_Paulo
-Horário do Pacífico (EUA)	Pacific Standard Time	America/Los_Angeles
-Horário do Leste (EUA)	Eastern Standard Time	America/New_York
-Horário da Europa Central	W. Europe Standard Time	Europe/Berlin
-Horário de Tóquio	Tokyo Standard Time	Asia/Tokyo
+function Get-IndicatorStatus {
+    param (
+        [Parameter(Mandatory = $true)]
+        [double]$Value,
+
+        [double]$GreenThreshold = 80,
+        [double]$YellowThreshold = 50,
+
+        [switch]$Invert
+    )
+
+    if (-not $Invert) {
+        # Standard mode: higher value = better
+        if ($Value -ge $GreenThreshold) {
+            return "Green"
+        }
+        elseif ($Value -ge $YellowThreshold -and $Value -lt $GreenThreshold) {
+            return "Yellow"
+        }
+        else {
+            return "Red"
+        }
+    }
+    else {
+        # Inverted mode: lower value = better
+        if ($Value -le $YellowThreshold) {
+            return "Green"
+        }
+        elseif ($Value -le $GreenThreshold -and $Value -gt $YellowThreshold) {
+            return "Yellow"
+        }
+        else {
+            return "Red"
+        }
+    }
+}
+
+
+# Custom thresholds: Green ≥ 90, Yellow ≥ 70
+$status = Get-IndicatorStatus -Value 75 -GreenThreshold 90 -YellowThreshold 70
+Write-Host "Status: $status"   # Output: Yellow
+
+
+# Custom: Green ≤ 20, Yellow ≤ 40
+$status = Get-IndicatorStatus -Value 35 -Invert -GreenThreshold 40 -YellowThreshold 20
+Write-Host "Status: $status"   # Output: Yellow
+
