@@ -1,47 +1,26 @@
-function Get-IndicatorStatus {
-    param (
-        [Parameter(Mandatory = $true)]
-        [double]$Value,
+# Start the timer
+$timer = [System.Diagnostics.Stopwatch]::StartNew()
 
-        [double]$GreenThreshold = 80,
-        [double]$YellowThreshold = 50,
+Write-Host "⏳ Starting the process..." -ForegroundColor Cyan
 
-        [switch]$Invert
-    )
+# Simulate a long-running process (e.g., 5 seconds)
+Start-Sleep -Seconds 5
 
-    if (-not $Invert) {
-        # Standard mode: higher value = better
-        if ($Value -ge $GreenThreshold) {
-            return "Green"
-        }
-        elseif ($Value -ge $YellowThreshold -and $Value -lt $GreenThreshold) {
-            return "Yellow"
-        }
-        else {
-            return "Red"
-        }
-    }
-    else {
-        # Inverted mode: lower value = better
-        if ($Value -le $YellowThreshold) {
-            return "Green"
-        }
-        elseif ($Value -le $GreenThreshold -and $Value -gt $YellowThreshold) {
-            return "Yellow"
-        }
-        else {
-            return "Red"
-        }
-    }
-}
+# Example placeholder for your actual processing:
+# $connection.Open()
+# $reader = $command.ExecuteReader()
+# while ($reader.Read()) { ... }
+# $reader.Close()
+# $connection.Close()
 
+# Stop the timer
+$timer.Stop()
 
-# Custom thresholds: Green ≥ 90, Yellow ≥ 70
-$status = Get-IndicatorStatus -Value 75 -GreenThreshold 90 -YellowThreshold 70
-Write-Host "Status: $status"   # Output: Yellow
+# Calculate elapsed time
+$elapsed = $timer.Elapsed
+$hours = [int]$elapsed.TotalHours
+$minutes = $elapsed.Minutes
+$seconds = $elapsed.Seconds
 
-
-# Custom: Green ≤ 20, Yellow ≤ 40
-$status = Get-IndicatorStatus -Value 35 -Invert -GreenThreshold 40 -YellowThreshold 20
-Write-Host "Status: $status"   # Output: Yellow
-
+Write-Host "`n✅ Process completed!" -ForegroundColor Green
+Write-Host "⏱ Total elapsed time: $hours hour(s), $minutes minute(s), $seconds second(s)" -ForegroundColor Yellow
