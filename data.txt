@@ -1,150 +1,64 @@
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
-using System.Net.Http;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-
-namespace LargeDataFilterApp
+private async void BtnProcessSelected_Click(object sender, EventArgs e)
 {
-    public partial class DataProcessorForm : Form
+    if (dataGrid.SelectedRows.Count == 0)
     {
-        private readonly string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;Trusted_Connection=True;TrustServerCertificate=True;";
-        private readonly string _apiUrl = "https://yourapi.com/data/"; // Base URL — we'll append the ID
-        private readonly HttpClient _httpClient = new HttpClient();
-
-        public DataProcessorForm()
-        {
-            InitializeComponent();
-        }
-
-        private async void BtnLoadData_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                string filterColumn = cmbFilterColumn.SelectedItem?.ToString();
-                string filterValue = txtFilterValue.Text.Trim();
-
-                if (string.IsNullOrWhiteSpace(filterColumn) || string.IsNullOrWhiteSpace(filterValue))
-                {
-                    MessageBox.Show("Please select a column and enter a filter value.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                string query = $"SELECT TOP 1000 * FROM LargeTable WHERE {filterColumn} LIKE @FilterValue";
-
-                using var connection = new SqlConnection(_connectionString);
-                using var command = new SqlCommand(query, connection);
-                command.Parameters.AddWithValue("@FilterValue", $"%{filterValue}%");
-
-                var adapter = new SqlDataAdapter(command);
-                var table = new DataTable();
-                adapter.Fill(table);
-
-                dataGridView1.DataSource = table;
-                lblStatus.Text = $"{table.Rows.Count} rows loaded.";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void BtnApplyRegexFilter_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                string pattern = txtRegexPattern.Text.Trim();
-                if (string.IsNullOrWhiteSpace(pattern))
-                {
-                    MessageBox.Show("Please enter a valid regex pattern.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                if (dataGridView1.DataSource is not DataTable table)
-                {
-                    MessageBox.Show("No data loaded to apply filter.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                var filteredTable = table.Clone();
-
-                foreach (DataRow row in table.Rows)
-                {
-                    foreach (var item in row.ItemArray)
-                    {
-                        if (Regex.IsMatch(item?.ToString() ?? string.Empty, pattern))
-                        {
-                            filteredTable.ImportRow(row);
-                            break;
-                        }
-                    }
-                }
-
-                dataGridView1.DataSource = filteredTable;
-                lblStatus.Text = $"{filteredTable.Rows.Count} rows after regex filter.";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error applying regex filter: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private async void BtnProcessSelected_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                if (dataGridView1.SelectedRows.Count == 0)
-                {
-                    MessageBox.Show("Please select at least one row to process.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                foreach (DataGridViewRow row in dataGridView1.SelectedRows)
-                {
-                    if (row.Cells["Id"]?.Value == null) continue;
-
-                    var id = row.Cells["Id"].Value.ToString();
-
-                    // GET request with ID appended to base API URL
-                    var apiResponse = await _httpClient.GetAsync($"{_apiUrl}{id}");
-                    apiResponse.EnsureSuccessStatusCode();
-
-                    var jsonResponse = await apiResponse.Content.ReadAsStringAsync();
-                    var apiResult = JsonSerializer.Deserialize<ApiResult>(jsonResponse);
-
-                    await SaveResultToDatabaseAsync(id, apiResult);
-                }
-
-                MessageBox.Show("Selected rows processed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error processing selected rows: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private async Task SaveResultToDatabaseAsync(string id, ApiResult result)
-        {
-            string insertQuery = "INSERT INTO ProcessedResults (RecordId, Status, ProcessedAt) VALUES (@RecordId, @Status, @ProcessedAt)";
-
-            using var connection = new SqlConnection(_connectionString);
-            using var command = new SqlCommand(insertQuery, connection);
-
-            command.Parameters.AddWithValue("@RecordId", id);
-            command.Parameters.AddWithValue("@Status", result?.Status ?? "Unknown");
-            command.Parameters.AddWithValue("@ProcessedAt", DateTime.UtcNow);
-
-            await connection.OpenAsync();
-            await command.ExecuteNonQueryAsync();
-        }
+        MessageBox.Show("Please select at least one row to process.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
     }
 
-    public class ApiResult
+    foreach (DataGridViewRow row in dataGrid.SelectedRows)
     {
-        public string Status { get; set; }
+        if (row.Cells["Id"]?.Value == null)
+            continue;
+
+        string id = row.Cells["Id"].Value.ToString();
+        string requestUrl = $"{_apiUrl}/{id}"; // GET with concatenated ID
+
+        try
+        {
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(requestUrl);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                MessageBox.Show($"Failed to process ID {id}. Status: {response.StatusCode}");
+                continue;
+            }
+
+            var jsonString = await response.Content.ReadAsStringAsync();
+
+            // Parse JSON dynamically
+            var jsonNode = JsonNode.Parse(jsonString);
+
+            // Optional: Convert to dictionary if needed
+            var flatData = new Dictionary<string, object>();
+            if (jsonNode is JsonObject obj)
+            {
+                foreach (var kvp in obj)
+                {
+                    flatData[kvp.Key] = kvp.Value?.ToString();
+                }
+            }
+
+            // Save to database (example placeholder)
+            SaveApiResultToDatabase(id, jsonString);
+
+            // Optionally display in a message box for debugging
+            MessageBox.Show($"Processed ID {id}:\n{jsonString}", "API Response");
+
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error processing ID {id}: {ex.Message}");
+        }
     }
+}
+
+// Example of saving the raw JSON string to the database
+private void SaveApiResultToDatabase(string id, string rawJson)
+{
+    // Example: insert into table
+    // You could store rawJson in a NVARCHAR(MAX) column
+    // or deserialize it into a dynamic set of columns.
+    Console.WriteLine($"Saving to DB - ID: {id}, JSON: {rawJson}");
 }
