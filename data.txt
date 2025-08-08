@@ -65,22 +65,30 @@ namespace LogExtractorApp
                     }
                     else if (extension == ".gz" && fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
                     {
-                        string tempTarPath = Path.Combine(txtOutputDir.Text, Path.GetFileNameWithoutExtension(fileName));
-                        Directory.CreateDirectory(tempTarPath);
-
-                        string tempTarFile = Path.Combine(tempTarPath, Path.GetFileNameWithoutExtension(fileName) + ".tar");
-
                         using (FileStream originalFileStream = File.OpenRead(filePath))
-                        using (FileStream decompressedFileStream = File.Create(tempTarFile))
                         using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
+                        using (var tarReader = new TarReader(decompressionStream))
                         {
-                            decompressionStream.CopyTo(decompressedFileStream);
+                            TarEntry entry;
+                            while ((entry = tarReader.GetNextEntry()) != null)
+                            {
+                                if (!entry.EntryType.Equals(TarEntryType.RegularFile))
+                                    continue;
+
+                                if (Path.GetExtension(entry.Name).Equals(".log", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    string logFileName = Path.GetFileName(entry.Name);
+                                    string destPath = Path.Combine(txtOutputDir.Text, logFileName);
+
+                                    using (var outputFile = File.Create(destPath))
+                                    {
+                                        entry.DataStream.CopyTo(outputFile);
+                                    }
+
+                                    AddRow(logFileName, "Extraído do TAR.GZ");
+                                }
+                            }
                         }
-
-                        TarFile.ExtractToDirectory(tempTarFile, tempTarPath, overwriteFiles: true);
-                        File.Delete(tempTarFile);
-
-                        AddRow(fileName, "Extraído");
                     }
                 }
                 catch (Exception ex)
