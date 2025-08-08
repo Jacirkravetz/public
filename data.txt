@@ -1,107 +1,196 @@
+namespace LogExtractorApp
+{
+    partial class DataProcessorForm
+    {
+        private System.ComponentModel.IContainer components = null;
+        private System.Windows.Forms.DataGridView dataGridViewResults;
+        private System.Windows.Forms.TextBox txtFilterColumn;
+        private System.Windows.Forms.TextBox txtRegexPattern;
+        private System.Windows.Forms.Button btnLoadData;
+        private System.Windows.Forms.Button btnApplyRegexFilter;
+        private System.Windows.Forms.Button btnProcessSelected;
+        private System.Windows.Forms.Label lblFilterColumn;
+        private System.Windows.Forms.Label lblRegexPattern;
+        private System.Windows.Forms.TextBox txtDbFilter;
+        private System.Windows.Forms.Label lblDbFilter;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.dataGridViewResults = new System.Windows.Forms.DataGridView();
+            this.txtFilterColumn = new System.Windows.Forms.TextBox();
+            this.txtRegexPattern = new System.Windows.Forms.TextBox();
+            this.btnLoadData = new System.Windows.Forms.Button();
+            this.btnApplyRegexFilter = new System.Windows.Forms.Button();
+            this.btnProcessSelected = new System.Windows.Forms.Button();
+            this.lblFilterColumn = new System.Windows.Forms.Label();
+            this.lblRegexPattern = new System.Windows.Forms.Label();
+            this.txtDbFilter = new System.Windows.Forms.TextBox();
+            this.lblDbFilter = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).BeginInit();
+            this.SuspendLayout();
+            // 
+            // dataGridViewResults
+            // 
+            this.dataGridViewResults.AllowUserToAddRows = false;
+            this.dataGridViewResults.AllowUserToDeleteRows = false;
+            this.dataGridViewResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridViewResults.Location = new System.Drawing.Point(12, 120);
+            this.dataGridViewResults.MultiSelect = true;
+            this.dataGridViewResults.Name = "dataGridViewResults";
+            this.dataGridViewResults.ReadOnly = true;
+            this.dataGridViewResults.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dataGridViewResults.Size = new System.Drawing.Size(760, 350);
+            this.dataGridViewResults.TabIndex = 0;
+            // 
+            // txtDbFilter
+            // 
+            this.txtDbFilter.Location = new System.Drawing.Point(130, 15);
+            this.txtDbFilter.Name = "txtDbFilter";
+            this.txtDbFilter.Size = new System.Drawing.Size(250, 23);
+            this.txtDbFilter.TabIndex = 1;
+            // 
+            // lblDbFilter
+            // 
+            this.lblDbFilter.AutoSize = true;
+            this.lblDbFilter.Location = new System.Drawing.Point(12, 18);
+            this.lblDbFilter.Name = "lblDbFilter";
+            this.lblDbFilter.Size = new System.Drawing.Size(112, 15);
+            this.lblDbFilter.TabIndex = 2;
+            this.lblDbFilter.Text = "Database Filter (SQL)";
+            // 
+            // lblFilterColumn
+            // 
+            this.lblFilterColumn.AutoSize = true;
+            this.lblFilterColumn.Location = new System.Drawing.Point(12, 50);
+            this.lblFilterColumn.Name = "lblFilterColumn";
+            this.lblFilterColumn.Size = new System.Drawing.Size(77, 15);
+            this.lblFilterColumn.TabIndex = 3;
+            this.lblFilterColumn.Text = "Filter Column:";
+            // 
+            // txtFilterColumn
+            // 
+            this.txtFilterColumn.Location = new System.Drawing.Point(130, 47);
+            this.txtFilterColumn.Name = "txtFilterColumn";
+            this.txtFilterColumn.Size = new System.Drawing.Size(250, 23);
+            this.txtFilterColumn.TabIndex = 4;
+            // 
+            // lblRegexPattern
+            // 
+            this.lblRegexPattern.AutoSize = true;
+            this.lblRegexPattern.Location = new System.Drawing.Point(12, 80);
+            this.lblRegexPattern.Name = "lblRegexPattern";
+            this.lblRegexPattern.Size = new System.Drawing.Size(85, 15);
+            this.lblRegexPattern.TabIndex = 5;
+            this.lblRegexPattern.Text = "Regex Pattern:";
+            // 
+            // txtRegexPattern
+            // 
+            this.txtRegexPattern.Location = new System.Drawing.Point(130, 77);
+            this.txtRegexPattern.Name = "txtRegexPattern";
+            this.txtRegexPattern.Size = new System.Drawing.Size(250, 23);
+            this.txtRegexPattern.TabIndex = 6;
+            // 
+            // btnLoadData
+            // 
+            this.btnLoadData.Location = new System.Drawing.Point(400, 15);
+            this.btnLoadData.Name = "btnLoadData";
+            this.btnLoadData.Size = new System.Drawing.Size(100, 25);
+            this.btnLoadData.TabIndex = 7;
+            this.btnLoadData.Text = "Load Data";
+            this.btnLoadData.UseVisualStyleBackColor = true;
+            this.btnLoadData.Click += new System.EventHandler(this.BtnLoadData_Click);
+            // 
+            // btnApplyRegexFilter
+            // 
+            this.btnApplyRegexFilter.Location = new System.Drawing.Point(400, 75);
+            this.btnApplyRegexFilter.Name = "btnApplyRegexFilter";
+            this.btnApplyRegexFilter.Size = new System.Drawing.Size(130, 25);
+            this.btnApplyRegexFilter.TabIndex = 8;
+            this.btnApplyRegexFilter.Text = "Apply Regex Filter";
+            this.btnApplyRegexFilter.UseVisualStyleBackColor = true;
+            this.btnApplyRegexFilter.Click += new System.EventHandler(this.BtnApplyRegexFilter_Click);
+            // 
+            // btnProcessSelected
+            // 
+            this.btnProcessSelected.Location = new System.Drawing.Point(550, 75);
+            this.btnProcessSelected.Name = "btnProcessSelected";
+            this.btnProcessSelected.Size = new System.Drawing.Size(140, 25);
+            this.btnProcessSelected.TabIndex = 9;
+            this.btnProcessSelected.Text = "Process Selected";
+            this.btnProcessSelected.UseVisualStyleBackColor = true;
+            this.btnProcessSelected.Click += new System.EventHandler(this.BtnProcessSelected_Click);
+            // 
+            // DataProcessorForm
+            // 
+            this.ClientSize = new System.Drawing.Size(784, 481);
+            this.Controls.Add(this.btnProcessSelected);
+            this.Controls.Add(this.btnApplyRegexFilter);
+            this.Controls.Add(this.btnLoadData);
+            this.Controls.Add(this.txtRegexPattern);
+            this.Controls.Add(this.lblRegexPattern);
+            this.Controls.Add(this.txtFilterColumn);
+            this.Controls.Add(this.lblFilterColumn);
+            this.Controls.Add(this.txtDbFilter);
+            this.Controls.Add(this.lblDbFilter);
+            this.Controls.Add(this.dataGridViewResults);
+            this.Name = "DataProcessorForm";
+            this.Text = "Data Processor";
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+        }
+    }
+}
+
+
+
 using System;
 using System.Data;
 using System.Data.SqlClient;
-using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace LargeDataProcessor
+namespace LogExtractorApp
 {
     public partial class DataProcessorForm : Form
     {
+        private readonly string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;Trusted_Connection=True;";
+        private readonly string _apiUrl = "https://api.example.com/process";
         private DataTable _dataTable;
-        private string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;User Id=USER;Password=PASS;TrustServerCertificate=True;";
-        private string _apiUrl = "https://api.example.com/process"; // Replace with your API endpoint
 
         public DataProcessorForm()
         {
             InitializeComponent();
-            InitializeUI();
         }
 
-        private void InitializeUI()
-        {
-            this.Text = "Data Processor";
-            this.Width = 1200;
-            this.Height = 700;
-
-            // Panel for filters
-            Panel filterPanel = new Panel { Dock = DockStyle.Top, Height = 80 };
-            this.Controls.Add(filterPanel);
-
-            Label lblFilterCol = new Label { Text = "Filter Column:", Left = 10, Top = 10, Width = 100 };
-            filterPanel.Controls.Add(lblFilterCol);
-
-            TextBox txtFilterColumn = new TextBox { Name = "txtFilterColumn", Left = 120, Top = 8, Width = 150 };
-            filterPanel.Controls.Add(txtFilterColumn);
-
-            Label lblFilterValue = new Label { Text = "Filter Value:", Left = 300, Top = 10, Width = 80 };
-            filterPanel.Controls.Add(lblFilterValue);
-
-            TextBox txtFilterValue = new TextBox { Name = "txtFilterValue", Left = 390, Top = 8, Width = 150 };
-            filterPanel.Controls.Add(txtFilterValue);
-
-            Button btnLoad = new Button { Text = "Load Data", Left = 560, Top = 6, Width = 100 };
-            btnLoad.Click += async (s, e) => await LoadDataAsync(txtFilterColumn.Text, txtFilterValue.Text);
-            filterPanel.Controls.Add(btnLoad);
-
-            Label lblRegex = new Label { Text = "Regex Filter:", Left = 10, Top = 45, Width = 100 };
-            filterPanel.Controls.Add(lblRegex);
-
-            TextBox txtRegex = new TextBox { Name = "txtRegex", Left = 120, Top = 43, Width = 200 };
-            filterPanel.Controls.Add(txtRegex);
-
-            Button btnApplyRegex = new Button { Text = "Apply Regex", Left = 340, Top = 41, Width = 100 };
-            btnApplyRegex.Click += (s, e) => ApplyRegexFilter(txtRegex.Text);
-            filterPanel.Controls.Add(btnApplyRegex);
-
-            Button btnProcess = new Button { Text = "Process Results", Left = 460, Top = 41, Width = 120 };
-            btnProcess.Click += async (s, e) => await ProcessResultsAsync();
-            filterPanel.Controls.Add(btnProcess);
-
-            // DataGrid
-            DataGridView dgv = new DataGridView
-            {
-                Name = "dataGridView",
-                Dock = DockStyle.Fill,
-                ReadOnly = true,
-                AllowUserToAddRows = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-            };
-            this.Controls.Add(dgv);
-        }
-
-        private async Task LoadDataAsync(string column, string value)
+        private async void BtnLoadData_Click(object sender, EventArgs e)
         {
             try
             {
-                string query = "SELECT TOP (100000) * FROM YourTable"; // limit initial load for performance
-                if (!string.IsNullOrEmpty(column) && !string.IsNullOrEmpty(value))
-                {
-                    query += $" WHERE {column} = @value";
-                }
+                string sql = "SELECT TOP 100000 * FROM YourLargeTable WHERE YourColumn LIKE @filter"; // Filtering before loading
+                using var conn = new SqlConnection(_connectionString);
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@filter", $"%{txtDbFilter.Text}%");
 
-                using (SqlConnection conn = new SqlConnection(_connectionString))
-                using (SqlCommand cmd = new SqlCommand(query, conn))
-                {
-                    if (!string.IsNullOrEmpty(column) && !string.IsNullOrEmpty(value))
-                    {
-                        cmd.Parameters.AddWithValue("@value", value);
-                    }
+                await conn.OpenAsync();
+                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
 
-                    await conn.OpenAsync();
-                    SqlDataAdapter adapter = new SqlDataAdapter(cmd);
-                    _dataTable = new DataTable();
-                    adapter.Fill(_dataTable);
-
-                    var dgv = this.Controls.Find("dataGridView", true)[0] as DataGridView;
-                    dgv.DataSource = _dataTable;
-                }
-
-                MessageBox.Show("Data loaded successfully!", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dataTable = new DataTable();
+                _dataTable.Load(reader);
+                dataGridViewResults.DataSource = _dataTable;
             }
             catch (Exception ex)
             {
@@ -109,75 +198,86 @@ namespace LargeDataProcessor
             }
         }
 
-        private void ApplyRegexFilter(string pattern)
+        private void BtnApplyRegexFilter_Click(object sender, EventArgs e)
         {
-            if (_dataTable == null || _dataTable.Rows.Count == 0)
+            if (_dataTable == null)
             {
-                MessageBox.Show("No data to filter.");
+                MessageBox.Show("Load data first.");
                 return;
             }
 
             try
             {
-                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
-                DataView dv = new DataView(_dataTable);
-                string filterExpression = string.Join(" OR ", _dataTable.Columns.Cast<DataColumn>()
-                    .Select(col => $"Convert([{col.ColumnName}], 'System.String') LIKE '%{pattern}%'"));
+                string columnName = txtFilterColumn.Text;
+                string pattern = txtRegexPattern.Text;
 
-                // Keep matching rows
-                dv.RowFilter = filterExpression;
-                var dgv = this.Controls.Find("dataGridView", true)[0] as DataGridView;
-                dgv.DataSource = dv;
+                if (!_dataTable.Columns.Contains(columnName))
+                {
+                    MessageBox.Show("Invalid column name.");
+                    return;
+                }
+
+                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                DataView view = new DataView(_dataTable);
+                var filtered = _dataTable.AsEnumerable()
+                    .Where(row => regex.IsMatch(row[columnName]?.ToString() ?? ""))
+                    .CopyToDataTable();
+
+                dataGridViewResults.DataSource = filtered;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Invalid regex: {ex.Message}");
+                MessageBox.Show($"Error applying regex: {ex.Message}");
             }
         }
 
-        private async Task ProcessResultsAsync()
+        private async void BtnProcessSelected_Click(object sender, EventArgs e)
         {
-            var dgv = this.Controls.Find("dataGridView", true)[0] as DataGridView;
-            if (dgv.DataSource == null || dgv.Rows.Count == 0)
+            if (dataGridViewResults.SelectedRows.Count == 0)
             {
-                MessageBox.Show("No data to process.");
+                MessageBox.Show("Select rows to process.");
                 return;
             }
 
-            using (HttpClient client = new HttpClient())
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            using HttpClient client = new HttpClient();
+
+            foreach (DataGridViewRow row in dataGridViewResults.SelectedRows)
             {
-                await conn.OpenAsync();
-
-                foreach (DataGridViewRow row in dgv.Rows)
+                var payload = new
                 {
-                    if (row.IsNewRow) continue;
+                    Id = row.Cells["Id"].Value,
+                    Data = row.Cells["YourColumn"].Value
+                };
 
-                    var id = row.Cells[0].Value?.ToString(); // Assuming first column is ID
-                    if (string.IsNullOrEmpty(id)) continue;
+                string json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                    try
-                    {
-                        var content = new StringContent($"{{\"id\":\"{id}\"}}", Encoding.UTF8, "application/json");
-                        HttpResponseMessage response = await client.PostAsync(_apiUrl, content);
-                        string apiResult = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var response = await client.PostAsync(_apiUrl, content);
+                    string result = await response.Content.ReadAsStringAsync();
 
-                        // Save to another table
-                        using (SqlCommand cmd = new SqlCommand("INSERT INTO ProcessedResults (OriginalId, ApiResponse) VALUES (@id, @resp)", conn))
-                        {
-                            cmd.Parameters.AddWithValue("@id", id);
-                            cmd.Parameters.AddWithValue("@resp", apiResult);
-                            await cmd.ExecuteNonQueryAsync();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Error processing ID {id}: {ex.Message}");
-                    }
+                    await SaveResultToDatabase(payload.Id.ToString(), result);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error processing row: {ex.Message}");
                 }
             }
 
-            MessageBox.Show("Processing completed.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Processing complete.");
+        }
+
+        private async Task SaveResultToDatabase(string id, string result)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand("INSERT INTO ProcessedResults (RecordId, Result, ProcessedAt) VALUES (@id, @result, @date)", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@result", result);
+            cmd.Parameters.AddWithValue("@date", DateTime.UtcNow);
+
+            await conn.OpenAsync();
+            await cmd.ExecuteNonQueryAsync();
         }
     }
 }
