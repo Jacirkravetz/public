@@ -1,168 +1,82 @@
+/LogAndDbProcessor
+ ├── Program.cs
+ ├── MainForm.cs
+ ├── LogExtractorForm.cs
+ ├── DatabaseProcessorForm.cs
+ ├── Services
+ │    ├── LogExtractorService.cs
+ │    ├── DatabaseService.cs
+ │    ├── ApiService.cs
+ ├── Models
+ │    ├── DatabaseRecord.cs
+ │    ├── ApiResult.cs
+
+
+
 using System;
-using System.Data;
-using System.Data.SqlClient;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using LogAndDbProcessor.Services;
 
-namespace LogExtractorWinForms
+namespace LogAndDbProcessor
 {
-    public partial class DataProcessorForm : Form
+    public partial class LogExtractorForm : Form
     {
-        private DataTable _loadedData;
-        private string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;User Id=USER;Password=PASS;";
-        private string _apiEndpoint = "https://yourapi.com/endpoint";
+        private readonly LogExtractorService _logService = new LogExtractorService();
 
-        public DataProcessorForm()
+        public LogExtractorForm()
         {
             InitializeComponent();
-            InitializeCustomComponents();
-        }
 
-        private void InitializeCustomComponents()
-        {
-            this.Text = "Data Processor";
-            this.Width = 1000;
-            this.Height = 700;
-
-            // Filter controls
-            var lblFilter = new Label { Text = "Initial Filter (WHERE conditions):", Top = 10, Left = 10, Width = 250 };
-            var txtFilter = new TextBox { Name = "txtFilter", Top = 30, Left = 10, Width = 500 };
-
-            var btnLoad = new Button { Text = "Load Data", Top = 30, Left = 530, Width = 100 };
-            btnLoad.Click += async (s, e) => await LoadDataAsync(txtFilter.Text);
-
-            var lblRegex = new Label { Text = "Regex Filter (applies to all columns):", Top = 70, Left = 10, Width = 250 };
-            var txtRegex = new TextBox { Name = "txtRegex", Top = 90, Left = 10, Width = 500 };
-
-            var btnApplyRegex = new Button { Text = "Apply Regex Filter", Top = 90, Left = 530, Width = 150 };
-            btnApplyRegex.Click += (s, e) => ApplyRegexFilter(txtRegex.Text);
-
-            // Grid
-            var grid = new DataGridView
+            var lblSource = new Label { Text = "Source Directory:", Top = 20, Left = 20 };
+            var txtSource = new TextBox { Top = 40, Left = 20, Width = 300 };
+            var btnBrowseSource = new Button { Text = "...", Top = 40, Left = 330 };
+            btnBrowseSource.Click += (s, e) =>
             {
-                Name = "dataGrid",
-                Top = 130,
-                Left = 10,
-                Width = 960,
-                Height = 450,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+                using var dialog = new FolderBrowserDialog();
+                if (dialog.ShowDialog() == DialogResult.OK)
+                    txtSource.Text = dialog.SelectedPath;
             };
 
-            // Process Button
-            var btnProcess = new Button { Text = "Process Selected", Top = 600, Left = 10, Width = 150 };
-            btnProcess.Click += async (s, e) => await ProcessSelectedAsync(grid);
+            var lblOutput = new Label { Text = "Output Directory:", Top = 80, Left = 20 };
+            var txtOutput = new TextBox { Top = 100, Left = 20, Width = 300 };
+            var btnBrowseOutput = new Button { Text = "...", Top = 100, Left = 330 };
+            btnBrowseOutput.Click += (s, e) =>
+            {
+                using var dialog = new FolderBrowserDialog();
+                if (dialog.ShowDialog() == DialogResult.OK)
+                    txtOutput.Text = dialog.SelectedPath;
+            };
 
-            Controls.Add(lblFilter);
-            Controls.Add(txtFilter);
-            Controls.Add(btnLoad);
-            Controls.Add(lblRegex);
-            Controls.Add(txtRegex);
-            Controls.Add(btnApplyRegex);
-            Controls.Add(grid);
+            var btnProcess = new Button { Text = "Process Logs", Top = 140, Left = 20, Width = 150 };
+            btnProcess.Click += async (s, e) =>
+            {
+                btnProcess.Enabled = false;
+                try
+                {
+                    await _logService.ProcessLogsAsync(txtSource.Text, txtOutput.Text);
+                    MessageBox.Show("Logs processed successfully!");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error: {ex.Message}");
+                }
+                finally
+                {
+                    btnProcess.Enabled = true;
+                }
+            };
+
+            Controls.Add(lblSource);
+            Controls.Add(txtSource);
+            Controls.Add(btnBrowseSource);
+            Controls.Add(lblOutput);
+            Controls.Add(txtOutput);
+            Controls.Add(btnBrowseOutput);
             Controls.Add(btnProcess);
-        }
 
-        private async Task LoadDataAsync(string filterCondition)
-        {
-            try
-            {
-                string query = "SELECT TOP 1000 * FROM YourTable"; // limit rows for UI safety
-                if (!string.IsNullOrWhiteSpace(filterCondition))
-                {
-                    query += " WHERE " + filterCondition;
-                }
-
-                using (SqlConnection conn = new SqlConnection(_connectionString))
-                using (SqlCommand cmd = new SqlCommand(query, conn))
-                using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
-                {
-                    _loadedData = new DataTable();
-                    await conn.OpenAsync();
-                    adapter.Fill(_loadedData);
-                }
-
-                var grid = Controls.Find("dataGrid", true)[0] as DataGridView;
-                grid.DataSource = _loadedData;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error loading data: " + ex.Message);
-            }
-        }
-
-        private void ApplyRegexFilter(string pattern)
-        {
-            if (_loadedData == null || string.IsNullOrWhiteSpace(pattern))
-                return;
-
-            try
-            {
-                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
-                DataTable filteredTable = _loadedData.Clone();
-
-                foreach (DataRow row in _loadedData.Rows)
-                {
-                    foreach (var item in row.ItemArray)
-                    {
-                        if (regex.IsMatch(item?.ToString() ?? string.Empty))
-                        {
-                            filteredTable.ImportRow(row);
-                            break;
-                        }
-                    }
-                }
-
-                var grid = Controls.Find("dataGrid", true)[0] as DataGridView;
-                grid.DataSource = filteredTable;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Invalid regex: " + ex.Message);
-            }
-        }
-
-        private async Task ProcessSelectedAsync(DataGridView grid)
-        {
-            if (grid.SelectedRows.Count == 0)
-            {
-                MessageBox.Show("No rows selected.");
-                return;
-            }
-
-            using (HttpClient client = new HttpClient())
-            using (SqlConnection conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
-
-                foreach (DataGridViewRow row in grid.SelectedRows)
-                {
-                    var payload = new
-                    {
-                        Id = row.Cells["Id"].Value,
-                        Data = row.Cells["SomeColumn"].Value
-                    };
-
-                    string jsonPayload = JsonSerializer.Serialize(payload);
-                    var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-                    HttpResponseMessage response = await client.PostAsync(_apiEndpoint, content);
-                    string apiResult = await response.Content.ReadAsStringAsync();
-
-                    string insertQuery = "INSERT INTO ProcessedResults (SourceId, ApiResponse) VALUES (@SourceId, @ApiResponse)";
-                    using (SqlCommand cmd = new SqlCommand(insertQuery, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@SourceId", row.Cells["Id"].Value);
-                        cmd.Parameters.AddWithValue("@ApiResponse", apiResult);
-                        await cmd.ExecuteNonQueryAsync();
-                    }
-                }
-            }
-
-            MessageBox.Show("Processing completed.");
+            Text = "Log Extractor";
+            Width = 420;
+            Height = 240;
         }
     }
 }
