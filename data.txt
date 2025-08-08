@@ -1,26 +1,70 @@
-# Start the timer
-$timer = [System.Diagnostics.Stopwatch]::StartNew()
+using System;
+using System.IO;
+using System.IO.Compression;
+using System.Formats.Tar;
 
-Write-Host "⏳ Starting the process..." -ForegroundColor Cyan
+class Program
+{
+    static void Main(string[] args)
+    {
+        // Diretório de origem (logs)
+        string sourceDirectory = @"C:\Logs"; 
+        // Diretório de destino
+        string outputDirectory = Path.Combine(sourceDirectory, "output");
 
-# Simulate a long-running process (e.g., 5 seconds)
-Start-Sleep -Seconds 5
+        // Cria diretório de saída se não existir
+        Directory.CreateDirectory(outputDirectory);
 
-# Example placeholder for your actual processing:
-# $connection.Open()
-# $reader = $command.ExecuteReader()
-# while ($reader.Read()) { ... }
-# $reader.Close()
-# $connection.Close()
+        Console.WriteLine("🔍 Lendo diretório: " + sourceDirectory);
 
-# Stop the timer
-$timer.Stop()
+        // Lista todos arquivos .log e .tar.gz
+        var files = Directory.GetFiles(sourceDirectory, "*.*", SearchOption.TopDirectoryOnly);
 
-# Calculate elapsed time
-$elapsed = $timer.Elapsed
-$hours = [int]$elapsed.TotalHours
-$minutes = $elapsed.Minutes
-$seconds = $elapsed.Seconds
+        foreach (var filePath in files)
+        {
+            string extension = Path.GetExtension(filePath).ToLower();
+            string fileName = Path.GetFileName(filePath);
 
-Write-Host "`n✅ Process completed!" -ForegroundColor Green
-Write-Host "⏱ Total elapsed time: $hours hour(s), $minutes minute(s), $seconds second(s)" -ForegroundColor Yellow
+            try
+            {
+                if (extension == ".log")
+                {
+                    // Copia o arquivo .log
+                    string destPath = Path.Combine(outputDirectory, fileName);
+                    File.Copy(filePath, destPath, overwrite: true);
+                    Console.WriteLine($"📄 Copiado LOG: {fileName}");
+                }
+                else if (extension == ".gz" && fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extrair arquivo .tar.gz para uma pasta temporária
+                    string tempTarPath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(fileName));
+                    Directory.CreateDirectory(tempTarPath);
+
+                    // Descomprimir .gz para um .tar temporário
+                    string tempTarFile = Path.Combine(tempTarPath, Path.GetFileNameWithoutExtension(fileName) + ".tar");
+
+                    using (FileStream originalFileStream = File.OpenRead(filePath))
+                    using (FileStream decompressedFileStream = File.Create(tempTarFile))
+                    using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
+                    {
+                        decompressionStream.CopyTo(decompressedFileStream);
+                    }
+
+                    // Extrair o .tar
+                    TarFile.ExtractToDirectory(tempTarFile, tempTarPath, overwriteFiles: true);
+
+                    // Remove o .tar temporário
+                    File.Delete(tempTarFile);
+
+                    Console.WriteLine($"📦 Extraído TAR.GZ: {fileName} → {tempTarPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Erro ao processar {fileName}: {ex.Message}");
+            }
+        }
+
+        Console.WriteLine("\n✅ Processamento concluído!");
+    }
+}
