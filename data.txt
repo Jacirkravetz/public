@@ -2,69 +2,104 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Formats.Tar;
+using System.Windows.Forms;
 
-class Program
+namespace LogExtractorApp
 {
-    static void Main(string[] args)
+    public partial class Form1 : Form
     {
-        // Diretório de origem (logs)
-        string sourceDirectory = @"C:\Logs"; 
-        // Diretório de destino
-        string outputDirectory = Path.Combine(sourceDirectory, "output");
-
-        // Cria diretório de saída se não existir
-        Directory.CreateDirectory(outputDirectory);
-
-        Console.WriteLine("🔍 Lendo diretório: " + sourceDirectory);
-
-        // Lista todos arquivos .log e .tar.gz
-        var files = Directory.GetFiles(sourceDirectory, "*.*", SearchOption.TopDirectoryOnly);
-
-        foreach (var filePath in files)
+        public Form1()
         {
-            string extension = Path.GetExtension(filePath).ToLower();
-            string fileName = Path.GetFileName(filePath);
+            InitializeComponent();
+        }
 
-            try
+        private void btnSelectSource_Click(object sender, EventArgs e)
+        {
+            using (var folderDialog = new FolderBrowserDialog())
             {
-                if (extension == ".log")
+                if (folderDialog.ShowDialog() == DialogResult.OK)
                 {
-                    // Copia o arquivo .log
-                    string destPath = Path.Combine(outputDirectory, fileName);
-                    File.Copy(filePath, destPath, overwrite: true);
-                    Console.WriteLine($"📄 Copiado LOG: {fileName}");
+                    txtSourceDir.Text = folderDialog.SelectedPath;
                 }
-                else if (extension == ".gz" && fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Extrair arquivo .tar.gz para uma pasta temporária
-                    string tempTarPath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(fileName));
-                    Directory.CreateDirectory(tempTarPath);
-
-                    // Descomprimir .gz para um .tar temporário
-                    string tempTarFile = Path.Combine(tempTarPath, Path.GetFileNameWithoutExtension(fileName) + ".tar");
-
-                    using (FileStream originalFileStream = File.OpenRead(filePath))
-                    using (FileStream decompressedFileStream = File.Create(tempTarFile))
-                    using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
-                    {
-                        decompressionStream.CopyTo(decompressedFileStream);
-                    }
-
-                    // Extrair o .tar
-                    TarFile.ExtractToDirectory(tempTarFile, tempTarPath, overwriteFiles: true);
-
-                    // Remove o .tar temporário
-                    File.Delete(tempTarFile);
-
-                    Console.WriteLine($"📦 Extraído TAR.GZ: {fileName} → {tempTarPath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Erro ao processar {fileName}: {ex.Message}");
             }
         }
 
-        Console.WriteLine("\n✅ Processamento concluído!");
+        private void btnSelectOutput_Click(object sender, EventArgs e)
+        {
+            using (var folderDialog = new FolderBrowserDialog())
+            {
+                if (folderDialog.ShowDialog() == DialogResult.OK)
+                {
+                    txtOutputDir.Text = folderDialog.SelectedPath;
+                }
+            }
+        }
+
+        private void btnProcess_Click(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(txtSourceDir.Text))
+            {
+                MessageBox.Show("Selecione um diretório de origem válido!", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (!Directory.Exists(txtOutputDir.Text))
+            {
+                Directory.CreateDirectory(txtOutputDir.Text);
+            }
+
+            var files = Directory.GetFiles(txtSourceDir.Text, "*.*", SearchOption.TopDirectoryOnly);
+
+            foreach (var filePath in files)
+            {
+                string extension = Path.GetExtension(filePath).ToLower();
+                string fileName = Path.GetFileName(filePath);
+
+                try
+                {
+                    if (extension == ".log")
+                    {
+                        string destPath = Path.Combine(txtOutputDir.Text, fileName);
+                        File.Copy(filePath, destPath, overwrite: true);
+                        AddRow(fileName, "Copiado");
+                    }
+                    else if (extension == ".gz" && fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string tempTarPath = Path.Combine(txtOutputDir.Text, Path.GetFileNameWithoutExtension(fileName));
+                        Directory.CreateDirectory(tempTarPath);
+
+                        string tempTarFile = Path.Combine(tempTarPath, Path.GetFileNameWithoutExtension(fileName) + ".tar");
+
+                        using (FileStream originalFileStream = File.OpenRead(filePath))
+                        using (FileStream decompressedFileStream = File.Create(tempTarFile))
+                        using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
+                        {
+                            decompressionStream.CopyTo(decompressedFileStream);
+                        }
+
+                        TarFile.ExtractToDirectory(tempTarFile, tempTarPath, overwriteFiles: true);
+                        File.Delete(tempTarFile);
+
+                        AddRow(fileName, "Extraído");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AddRow(fileName, "Erro: " + ex.Message);
+                }
+            }
+
+            MessageBox.Show("Processamento concluído!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void btnClear_Click(object sender, EventArgs e)
+        {
+            dataGridLogs.Rows.Clear();
+        }
+
+        private void AddRow(string fileName, string status)
+        {
+            dataGridLogs.Rows.Add(fileName, status, DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
+        }
     }
 }
