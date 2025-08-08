@@ -1,274 +1,168 @@
-// Program.cs
 using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace LogExtractorApp
+namespace LogExtractorWinForms
 {
-    static class Program
+    public partial class DataProcessorForm : Form
     {
-        [STAThread]
-        static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
-        }
-    }
-}
+        private DataTable _loadedData;
+        private string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;User Id=USER;Password=PASS;";
+        private string _apiEndpoint = "https://yourapi.com/endpoint";
 
-
-// Form1.cs
-using System;
-using System.IO;
-using System.IO.Compression;
-using System.Formats.Tar;
-using System.Windows.Forms;
-
-namespace LogExtractorApp
-{
-    public partial class Form1 : Form
-    {
-        public Form1()
+        public DataProcessorForm()
         {
             InitializeComponent();
+            InitializeCustomComponents();
         }
 
-        private void btnSelectSource_Click(object sender, EventArgs e)
+        private void InitializeCustomComponents()
         {
-            using (var folderDialog = new FolderBrowserDialog())
+            this.Text = "Data Processor";
+            this.Width = 1000;
+            this.Height = 700;
+
+            // Filter controls
+            var lblFilter = new Label { Text = "Initial Filter (WHERE conditions):", Top = 10, Left = 10, Width = 250 };
+            var txtFilter = new TextBox { Name = "txtFilter", Top = 30, Left = 10, Width = 500 };
+
+            var btnLoad = new Button { Text = "Load Data", Top = 30, Left = 530, Width = 100 };
+            btnLoad.Click += async (s, e) => await LoadDataAsync(txtFilter.Text);
+
+            var lblRegex = new Label { Text = "Regex Filter (applies to all columns):", Top = 70, Left = 10, Width = 250 };
+            var txtRegex = new TextBox { Name = "txtRegex", Top = 90, Left = 10, Width = 500 };
+
+            var btnApplyRegex = new Button { Text = "Apply Regex Filter", Top = 90, Left = 530, Width = 150 };
+            btnApplyRegex.Click += (s, e) => ApplyRegexFilter(txtRegex.Text);
+
+            // Grid
+            var grid = new DataGridView
             {
-                if (folderDialog.ShowDialog() == DialogResult.OK)
+                Name = "dataGrid",
+                Top = 130,
+                Left = 10,
+                Width = 960,
+                Height = 450,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            };
+
+            // Process Button
+            var btnProcess = new Button { Text = "Process Selected", Top = 600, Left = 10, Width = 150 };
+            btnProcess.Click += async (s, e) => await ProcessSelectedAsync(grid);
+
+            Controls.Add(lblFilter);
+            Controls.Add(txtFilter);
+            Controls.Add(btnLoad);
+            Controls.Add(lblRegex);
+            Controls.Add(txtRegex);
+            Controls.Add(btnApplyRegex);
+            Controls.Add(grid);
+            Controls.Add(btnProcess);
+        }
+
+        private async Task LoadDataAsync(string filterCondition)
+        {
+            try
+            {
+                string query = "SELECT TOP 1000 * FROM YourTable"; // limit rows for UI safety
+                if (!string.IsNullOrWhiteSpace(filterCondition))
                 {
-                    txtSourceDir.Text = folderDialog.SelectedPath;
+                    query += " WHERE " + filterCondition;
                 }
-            }
-        }
 
-        private void btnSelectOutput_Click(object sender, EventArgs e)
-        {
-            using (var folderDialog = new FolderBrowserDialog())
-            {
-                if (folderDialog.ShowDialog() == DialogResult.OK)
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                 {
-                    txtOutputDir.Text = folderDialog.SelectedPath;
+                    _loadedData = new DataTable();
+                    await conn.OpenAsync();
+                    adapter.Fill(_loadedData);
                 }
+
+                var grid = Controls.Find("dataGrid", true)[0] as DataGridView;
+                grid.DataSource = _loadedData;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading data: " + ex.Message);
             }
         }
 
-        private void btnProcess_Click(object sender, EventArgs e)
+        private void ApplyRegexFilter(string pattern)
         {
-            string source = txtSourceDir.Text;
-            string output = txtOutputDir.Text;
-
-            if (string.IsNullOrWhiteSpace(source) || !Directory.Exists(source))
-            {
-                MessageBox.Show("Please select a valid source directory.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (_loadedData == null || string.IsNullOrWhiteSpace(pattern))
                 return;
-            }
 
-            if (string.IsNullOrWhiteSpace(output))
+            try
             {
-                MessageBox.Show("Please select an output directory.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
+                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                DataTable filteredTable = _loadedData.Clone();
 
-            Directory.CreateDirectory(output);
-
-            var files = Directory.GetFiles(source, "*.*", SearchOption.TopDirectoryOnly);
-
-            foreach (var filePath in files)
-            {
-                string extension = Path.GetExtension(filePath).ToLowerInvariant();
-                string fileName = Path.GetFileName(filePath);
-
-                try
+                foreach (DataRow row in _loadedData.Rows)
                 {
-                    if (extension == ".log")
+                    foreach (var item in row.ItemArray)
                     {
-                        string destPath = Path.Combine(output, fileName);
-                        File.Copy(filePath, destPath, overwrite: true);
-                        AddRow(fileName, "Copied");
-                    }
-                    else if (extension == ".gz" && fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
-                    {
-                        using (FileStream originalFileStream = File.OpenRead(filePath))
-                        using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
-                        using (var tarReader = new TarReader(decompressionStream))
+                        if (regex.IsMatch(item?.ToString() ?? string.Empty))
                         {
-                            TarEntry entry;
-                            while ((entry = tarReader.GetNextEntry()) != null)
-                            {
-                                // We only care about regular files
-                                if (entry.EntryType != TarEntryType.RegularFile)
-                                    continue;
-
-                                // Normalize name and check extension
-                                string entryName = entry.Name.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
-
-                                if (string.Equals(Path.GetExtension(entryName), ".log", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    string logFileName = Path.GetFileName(entryName);
-                                    string destPath = Path.Combine(output, logFileName);
-
-                                    // Ensure destination directory exists (flat output)
-                                    Directory.CreateDirectory(Path.GetDirectoryName(destPath) ?? output);
-
-                                    using (var outputFile = File.Create(destPath))
-                                    {
-                                        entry.DataStream.CopyTo(outputFile);
-                                    }
-
-                                    AddRow(logFileName, "Extracted from TAR.GZ");
-                                }
-                            }
+                            filteredTable.ImportRow(row);
+                            break;
                         }
                     }
-                    else
+                }
+
+                var grid = Controls.Find("dataGrid", true)[0] as DataGridView;
+                grid.DataSource = filteredTable;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Invalid regex: " + ex.Message);
+            }
+        }
+
+        private async Task ProcessSelectedAsync(DataGridView grid)
+        {
+            if (grid.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("No rows selected.");
+                return;
+            }
+
+            using (HttpClient client = new HttpClient())
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+
+                foreach (DataGridViewRow row in grid.SelectedRows)
+                {
+                    var payload = new
                     {
-                        AddRow(fileName, "Skipped (unsupported)");
+                        Id = row.Cells["Id"].Value,
+                        Data = row.Cells["SomeColumn"].Value
+                    };
+
+                    string jsonPayload = JsonSerializer.Serialize(payload);
+                    var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                    HttpResponseMessage response = await client.PostAsync(_apiEndpoint, content);
+                    string apiResult = await response.Content.ReadAsStringAsync();
+
+                    string insertQuery = "INSERT INTO ProcessedResults (SourceId, ApiResponse) VALUES (@SourceId, @ApiResponse)";
+                    using (SqlCommand cmd = new SqlCommand(insertQuery, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@SourceId", row.Cells["Id"].Value);
+                        cmd.Parameters.AddWithValue("@ApiResponse", apiResult);
+                        await cmd.ExecuteNonQueryAsync();
                     }
                 }
-                catch (Exception ex)
-                {
-                    AddRow(fileName, "Error: " + ex.Message);
-                }
             }
 
-            MessageBox.Show("Processing completed.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private void btnClear_Click(object sender, EventArgs e)
-        {
-            dataGridLogs.Rows.Clear();
-        }
-
-        private void AddRow(string fileName, string status)
-        {
-            dataGridLogs.Rows.Add(fileName, status, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-        }
-    }
-}
-
-
-// Form1.Designer.cs
-namespace LogExtractorApp
-{
-    partial class Form1
-    {
-        private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.TextBox txtSourceDir;
-        private System.Windows.Forms.TextBox txtOutputDir;
-        private System.Windows.Forms.Button btnSelectSource;
-        private System.Windows.Forms.Button btnSelectOutput;
-        private System.Windows.Forms.Button btnProcess;
-        private System.Windows.Forms.Button btnClear;
-        private System.Windows.Forms.DataGridView dataGridLogs;
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-
-        private void InitializeComponent()
-        {
-            this.txtSourceDir = new System.Windows.Forms.TextBox();
-            this.txtOutputDir = new System.Windows.Forms.TextBox();
-            this.btnSelectSource = new System.Windows.Forms.Button();
-            this.btnSelectOutput = new System.Windows.Forms.Button();
-            this.btnProcess = new System.Windows.Forms.Button();
-            this.btnClear = new System.Windows.Forms.Button();
-            this.dataGridLogs = new System.Windows.Forms.DataGridView();
-            ((System.ComponentModel.ISupportInitialize)(this.dataGridLogs)).BeginInit();
-            this.SuspendLayout();
-            // 
-            // txtSourceDir
-            // 
-            this.txtSourceDir.Location = new System.Drawing.Point(12, 12);
-            this.txtSourceDir.Name = "txtSourceDir";
-            this.txtSourceDir.Size = new System.Drawing.Size(440, 23);
-            this.txtSourceDir.TabIndex = 0;
-            // 
-            // btnSelectSource
-            // 
-            this.btnSelectSource.Location = new System.Drawing.Point(460, 11);
-            this.btnSelectSource.Name = "btnSelectSource";
-            this.btnSelectSource.Size = new System.Drawing.Size(120, 25);
-            this.btnSelectSource.TabIndex = 1;
-            this.btnSelectSource.Text = "Select Source...";
-            this.btnSelectSource.UseVisualStyleBackColor = true;
-            this.btnSelectSource.Click += new System.EventHandler(this.btnSelectSource_Click);
-            // 
-            // txtOutputDir
-            // 
-            this.txtOutputDir.Location = new System.Drawing.Point(12, 45);
-            this.txtOutputDir.Name = "txtOutputDir";
-            this.txtOutputDir.Size = new System.Drawing.Size(440, 23);
-            this.txtOutputDir.TabIndex = 2;
-            // 
-            // btnSelectOutput
-            // 
-            this.btnSelectOutput.Location = new System.Drawing.Point(460, 44);
-            this.btnSelectOutput.Name = "btnSelectOutput";
-            this.btnSelectOutput.Size = new System.Drawing.Size(120, 25);
-            this.btnSelectOutput.TabIndex = 3;
-            this.btnSelectOutput.Text = "Select Output...";
-            this.btnSelectOutput.UseVisualStyleBackColor = true;
-            this.btnSelectOutput.Click += new System.EventHandler(this.btnSelectOutput_Click);
-            // 
-            // btnProcess
-            // 
-            this.btnProcess.Location = new System.Drawing.Point(12, 80);
-            this.btnProcess.Name = "btnProcess";
-            this.btnProcess.Size = new System.Drawing.Size(120, 30);
-            this.btnProcess.TabIndex = 4;
-            this.btnProcess.Text = "Process";
-            this.btnProcess.UseVisualStyleBackColor = true;
-            this.btnProcess.Click += new System.EventHandler(this.btnProcess_Click);
-            // 
-            // btnClear
-            // 
-            this.btnClear.Location = new System.Drawing.Point(140, 80);
-            this.btnClear.Name = "btnClear";
-            this.btnClear.Size = new System.Drawing.Size(120, 30);
-            this.btnClear.TabIndex = 5;
-            this.btnClear.Text = "Clear";
-            this.btnClear.UseVisualStyleBackColor = true;
-            this.btnClear.Click += new System.EventHandler(this.btnClear_Click);
-            // 
-            // dataGridLogs
-            // 
-            this.dataGridLogs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dataGridLogs.Location = new System.Drawing.Point(12, 120);
-            this.dataGridLogs.Name = "dataGridLogs";
-            this.dataGridLogs.Size = new System.Drawing.Size(568, 320);
-            this.dataGridLogs.TabIndex = 6;
-            this.dataGridLogs.AllowUserToAddRows = false;
-            this.dataGridLogs.ColumnCount = 3;
-            this.dataGridLogs.Columns[0].Name = "File";
-            this.dataGridLogs.Columns[1].Name = "Status";
-            this.dataGridLogs.Columns[2].Name = "Timestamp";
-            // 
-            // Form1
-            // 
-            this.ClientSize = new System.Drawing.Size(592, 460);
-            this.Controls.Add(this.dataGridLogs);
-            this.Controls.Add(this.btnClear);
-            this.Controls.Add(this.btnProcess);
-            this.Controls.Add(this.btnSelectOutput);
-            this.Controls.Add(this.txtOutputDir);
-            this.Controls.Add(this.btnSelectSource);
-            this.Controls.Add(this.txtSourceDir);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.Name = "Form1";
-            this.Text = "Log Extractor";
-            ((System.ComponentModel.ISupportInitialize)(this.dataGridLogs)).EndInit();
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            MessageBox.Show("Processing completed.");
         }
     }
 }
