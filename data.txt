@@ -1,82 +1,183 @@
-/LogAndDbProcessor
- ├── Program.cs
- ├── MainForm.cs
- ├── LogExtractorForm.cs
- ├── DatabaseProcessorForm.cs
- ├── Services
- │    ├── LogExtractorService.cs
- │    ├── DatabaseService.cs
- │    ├── ApiService.cs
- ├── Models
- │    ├── DatabaseRecord.cs
- │    ├── ApiResult.cs
-
-
-
 using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using LogAndDbProcessor.Services;
 
-namespace LogAndDbProcessor
+namespace LargeDataProcessor
 {
-    public partial class LogExtractorForm : Form
+    public partial class DataProcessorForm : Form
     {
-        private readonly LogExtractorService _logService = new LogExtractorService();
+        private DataTable _dataTable;
+        private string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;User Id=USER;Password=PASS;TrustServerCertificate=True;";
+        private string _apiUrl = "https://api.example.com/process"; // Replace with your API endpoint
 
-        public LogExtractorForm()
+        public DataProcessorForm()
         {
             InitializeComponent();
+            InitializeUI();
+        }
 
-            var lblSource = new Label { Text = "Source Directory:", Top = 20, Left = 20 };
-            var txtSource = new TextBox { Top = 40, Left = 20, Width = 300 };
-            var btnBrowseSource = new Button { Text = "...", Top = 40, Left = 330 };
-            btnBrowseSource.Click += (s, e) =>
+        private void InitializeUI()
+        {
+            this.Text = "Data Processor";
+            this.Width = 1200;
+            this.Height = 700;
+
+            // Panel for filters
+            Panel filterPanel = new Panel { Dock = DockStyle.Top, Height = 80 };
+            this.Controls.Add(filterPanel);
+
+            Label lblFilterCol = new Label { Text = "Filter Column:", Left = 10, Top = 10, Width = 100 };
+            filterPanel.Controls.Add(lblFilterCol);
+
+            TextBox txtFilterColumn = new TextBox { Name = "txtFilterColumn", Left = 120, Top = 8, Width = 150 };
+            filterPanel.Controls.Add(txtFilterColumn);
+
+            Label lblFilterValue = new Label { Text = "Filter Value:", Left = 300, Top = 10, Width = 80 };
+            filterPanel.Controls.Add(lblFilterValue);
+
+            TextBox txtFilterValue = new TextBox { Name = "txtFilterValue", Left = 390, Top = 8, Width = 150 };
+            filterPanel.Controls.Add(txtFilterValue);
+
+            Button btnLoad = new Button { Text = "Load Data", Left = 560, Top = 6, Width = 100 };
+            btnLoad.Click += async (s, e) => await LoadDataAsync(txtFilterColumn.Text, txtFilterValue.Text);
+            filterPanel.Controls.Add(btnLoad);
+
+            Label lblRegex = new Label { Text = "Regex Filter:", Left = 10, Top = 45, Width = 100 };
+            filterPanel.Controls.Add(lblRegex);
+
+            TextBox txtRegex = new TextBox { Name = "txtRegex", Left = 120, Top = 43, Width = 200 };
+            filterPanel.Controls.Add(txtRegex);
+
+            Button btnApplyRegex = new Button { Text = "Apply Regex", Left = 340, Top = 41, Width = 100 };
+            btnApplyRegex.Click += (s, e) => ApplyRegexFilter(txtRegex.Text);
+            filterPanel.Controls.Add(btnApplyRegex);
+
+            Button btnProcess = new Button { Text = "Process Results", Left = 460, Top = 41, Width = 120 };
+            btnProcess.Click += async (s, e) => await ProcessResultsAsync();
+            filterPanel.Controls.Add(btnProcess);
+
+            // DataGrid
+            DataGridView dgv = new DataGridView
             {
-                using var dialog = new FolderBrowserDialog();
-                if (dialog.ShowDialog() == DialogResult.OK)
-                    txtSource.Text = dialog.SelectedPath;
+                Name = "dataGridView",
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
+            this.Controls.Add(dgv);
+        }
 
-            var lblOutput = new Label { Text = "Output Directory:", Top = 80, Left = 20 };
-            var txtOutput = new TextBox { Top = 100, Left = 20, Width = 300 };
-            var btnBrowseOutput = new Button { Text = "...", Top = 100, Left = 330 };
-            btnBrowseOutput.Click += (s, e) =>
+        private async Task LoadDataAsync(string column, string value)
+        {
+            try
             {
-                using var dialog = new FolderBrowserDialog();
-                if (dialog.ShowDialog() == DialogResult.OK)
-                    txtOutput.Text = dialog.SelectedPath;
-            };
+                string query = "SELECT TOP (100000) * FROM YourTable"; // limit initial load for performance
+                if (!string.IsNullOrEmpty(column) && !string.IsNullOrEmpty(value))
+                {
+                    query += $" WHERE {column} = @value";
+                }
 
-            var btnProcess = new Button { Text = "Process Logs", Top = 140, Left = 20, Width = 150 };
-            btnProcess.Click += async (s, e) =>
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    if (!string.IsNullOrEmpty(column) && !string.IsNullOrEmpty(value))
+                    {
+                        cmd.Parameters.AddWithValue("@value", value);
+                    }
+
+                    await conn.OpenAsync();
+                    SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+                    _dataTable = new DataTable();
+                    adapter.Fill(_dataTable);
+
+                    var dgv = this.Controls.Find("dataGridView", true)[0] as DataGridView;
+                    dgv.DataSource = _dataTable;
+                }
+
+                MessageBox.Show("Data loaded successfully!", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
             {
-                btnProcess.Enabled = false;
-                try
-                {
-                    await _logService.ProcessLogsAsync(txtSource.Text, txtOutput.Text);
-                    MessageBox.Show("Logs processed successfully!");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error: {ex.Message}");
-                }
-                finally
-                {
-                    btnProcess.Enabled = true;
-                }
-            };
+                MessageBox.Show($"Error loading data: {ex.Message}");
+            }
+        }
 
-            Controls.Add(lblSource);
-            Controls.Add(txtSource);
-            Controls.Add(btnBrowseSource);
-            Controls.Add(lblOutput);
-            Controls.Add(txtOutput);
-            Controls.Add(btnBrowseOutput);
-            Controls.Add(btnProcess);
+        private void ApplyRegexFilter(string pattern)
+        {
+            if (_dataTable == null || _dataTable.Rows.Count == 0)
+            {
+                MessageBox.Show("No data to filter.");
+                return;
+            }
 
-            Text = "Log Extractor";
-            Width = 420;
-            Height = 240;
+            try
+            {
+                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                DataView dv = new DataView(_dataTable);
+                string filterExpression = string.Join(" OR ", _dataTable.Columns.Cast<DataColumn>()
+                    .Select(col => $"Convert([{col.ColumnName}], 'System.String') LIKE '%{pattern}%'"));
+
+                // Keep matching rows
+                dv.RowFilter = filterExpression;
+                var dgv = this.Controls.Find("dataGridView", true)[0] as DataGridView;
+                dgv.DataSource = dv;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Invalid regex: {ex.Message}");
+            }
+        }
+
+        private async Task ProcessResultsAsync()
+        {
+            var dgv = this.Controls.Find("dataGridView", true)[0] as DataGridView;
+            if (dgv.DataSource == null || dgv.Rows.Count == 0)
+            {
+                MessageBox.Show("No data to process.");
+                return;
+            }
+
+            using (HttpClient client = new HttpClient())
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+
+                foreach (DataGridViewRow row in dgv.Rows)
+                {
+                    if (row.IsNewRow) continue;
+
+                    var id = row.Cells[0].Value?.ToString(); // Assuming first column is ID
+                    if (string.IsNullOrEmpty(id)) continue;
+
+                    try
+                    {
+                        var content = new StringContent($"{{\"id\":\"{id}\"}}", Encoding.UTF8, "application/json");
+                        HttpResponseMessage response = await client.PostAsync(_apiUrl, content);
+                        string apiResult = await response.Content.ReadAsStringAsync();
+
+                        // Save to another table
+                        using (SqlCommand cmd = new SqlCommand("INSERT INTO ProcessedResults (OriginalId, ApiResponse) VALUES (@id, @resp)", conn))
+                        {
+                            cmd.Parameters.AddWithValue("@id", id);
+                            cmd.Parameters.AddWithValue("@resp", apiResult);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error processing ID {id}: {ex.Message}");
+                    }
+                }
+            }
+
+            MessageBox.Show("Processing completed.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }
