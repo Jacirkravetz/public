@@ -1,64 +1,123 @@
-private async void BtnProcessSelected_Click(object sender, EventArgs e)
+// Inside InitializeComponent()
+
+// Has_Delivery Label and ComboBox
+var lblHasDelivery = new Label
 {
-    if (dataGrid.SelectedRows.Count == 0)
+    Text = "Has Delivery:",
+    Location = new Point(12, 15),
+    AutoSize = true
+};
+this.Controls.Add(lblHasDelivery);
+
+var cmbHasDelivery = new ComboBox
+{
+    Name = "cmbHasDelivery",
+    Location = new Point(110, 12),
+    DropDownStyle = ComboBoxStyle.DropDownList,
+    Width = 60
+};
+cmbHasDelivery.Items.AddRange(new[] { "Any", "Yes", "No" });
+cmbHasDelivery.SelectedIndex = 0; // Default to Any
+this.Controls.Add(cmbHasDelivery);
+
+// Has_Confirmation Label and ComboBox
+var lblHasConfirmation = new Label
+{
+    Text = "Has Confirmation:",
+    Location = new Point(180, 15),
+    AutoSize = true
+};
+this.Controls.Add(lblHasConfirmation);
+
+var cmbHasConfirmation = new ComboBox
+{
+    Name = "cmbHasConfirmation",
+    Location = new Point(290, 12),
+    DropDownStyle = ComboBoxStyle.DropDownList,
+    Width = 60
+};
+cmbHasConfirmation.Items.AddRange(new[] { "Any", "Yes", "No" });
+cmbHasConfirmation.SelectedIndex = 0;
+this.Controls.Add(cmbHasConfirmation);
+
+// Has_Response Label and ComboBox
+var lblHasResponse = new Label
+{
+    Text = "Has Response:",
+    Location = new Point(360, 15),
+    AutoSize = true
+};
+this.Controls.Add(lblHasResponse);
+
+var cmbHasResponse = new ComboBox
+{
+    Name = "cmbHasResponse",
+    Location = new Point(450, 12),
+    DropDownStyle = ComboBoxStyle.DropDownList,
+    Width = 60
+};
+cmbHasResponse.Items.AddRange(new[] { "Any", "Yes", "No" });
+cmbHasResponse.SelectedIndex = 0;
+this.Controls.Add(cmbHasResponse);
+
+
+private async void BtnLoadData_Click(object sender, EventArgs e)
+{
+    try
     {
-        MessageBox.Show("Please select at least one row to process.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return;
+        // Find the combo boxes
+        var cmbHasDelivery = this.Controls.Find("cmbHasDelivery", true)[0] as ComboBox;
+        var cmbHasConfirmation = this.Controls.Find("cmbHasConfirmation", true)[0] as ComboBox;
+        var cmbHasResponse = this.Controls.Find("cmbHasResponse", true)[0] as ComboBox;
+
+        List<string> conditions = new List<string>();
+        var parameters = new List<SqlParameter>();
+
+        // Build SQL conditions based on combo box selections
+        if (cmbHasDelivery.SelectedItem?.ToString() == "Yes")
+        {
+            conditions.Add("Has_Delivery = 1");
+        }
+        else if (cmbHasDelivery.SelectedItem?.ToString() == "No")
+        {
+            conditions.Add("(Has_Delivery = 0 OR Has_Delivery IS NULL)");
+        }
+
+        if (cmbHasConfirmation.SelectedItem?.ToString() == "Yes")
+        {
+            conditions.Add("Has_Confirmation = 1");
+        }
+        else if (cmbHasConfirmation.SelectedItem?.ToString() == "No")
+        {
+            conditions.Add("(Has_Confirmation = 0 OR Has_Confirmation IS NULL)");
+        }
+
+        if (cmbHasResponse.SelectedItem?.ToString() == "Yes")
+        {
+            conditions.Add("Has_Response = 1");
+        }
+        else if (cmbHasResponse.SelectedItem?.ToString() == "No")
+        {
+            conditions.Add("(Has_Response = 0 OR Has_Response IS NULL)");
+        }
+
+        string whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
+
+        string sql = $"SELECT TOP 100000 * FROM YourLargeTable {whereClause}";
+
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand(sql, conn);
+
+        await conn.OpenAsync();
+        var adapter = new SqlDataAdapter(cmd);
+        var dt = new DataTable();
+        adapter.Fill(dt);
+
+        dataGridViewResults.DataSource = dt;
     }
-
-    foreach (DataGridViewRow row in dataGrid.SelectedRows)
+    catch (Exception ex)
     {
-        if (row.Cells["Id"]?.Value == null)
-            continue;
-
-        string id = row.Cells["Id"].Value.ToString();
-        string requestUrl = $"{_apiUrl}/{id}"; // GET with concatenated ID
-
-        try
-        {
-            using var httpClient = new HttpClient();
-            var response = await httpClient.GetAsync(requestUrl);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                MessageBox.Show($"Failed to process ID {id}. Status: {response.StatusCode}");
-                continue;
-            }
-
-            var jsonString = await response.Content.ReadAsStringAsync();
-
-            // Parse JSON dynamically
-            var jsonNode = JsonNode.Parse(jsonString);
-
-            // Optional: Convert to dictionary if needed
-            var flatData = new Dictionary<string, object>();
-            if (jsonNode is JsonObject obj)
-            {
-                foreach (var kvp in obj)
-                {
-                    flatData[kvp.Key] = kvp.Value?.ToString();
-                }
-            }
-
-            // Save to database (example placeholder)
-            SaveApiResultToDatabase(id, jsonString);
-
-            // Optionally display in a message box for debugging
-            MessageBox.Show($"Processed ID {id}:\n{jsonString}", "API Response");
-
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Error processing ID {id}: {ex.Message}");
-        }
+        MessageBox.Show($"Error loading data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }
 
-// Example of saving the raw JSON string to the database
-private void SaveApiResultToDatabase(string id, string rawJson)
-{
-    // Example: insert into table
-    // You could store rawJson in a NVARCHAR(MAX) column
-    // or deserialize it into a dynamic set of columns.
-    Console.WriteLine($"Saving to DB - ID: {id}, JSON: {rawJson}");
-}
