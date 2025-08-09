@@ -1,249 +1,188 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Text.RegularExpressions;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Net.Http;
+
 namespace LogExtractorApp
 {
-    partial class DataProcessorForm
+    public partial class DataProcessorForm : Form
     {
-        private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.DataGridView dataGridViewResults;
-        private System.Windows.Forms.ComboBox cmbHasDelivery;
-        private System.Windows.Forms.ComboBox cmbHasConfirmation;
-        private System.Windows.Forms.ComboBox cmbHasResponse;
-        private System.Windows.Forms.Label lblHasDelivery;
-        private System.Windows.Forms.Label lblHasConfirmation;
-        private System.Windows.Forms.Label lblHasResponse;
-        private System.Windows.Forms.TextBox txtRegexPattern;
-        private System.Windows.Forms.Label lblRegexPattern;
-        private System.Windows.Forms.Button btnLoadData;
-        private System.Windows.Forms.Button btnApplyRegexFilter;
-        private System.Windows.Forms.Button btnProcessSelected;
-        private System.Windows.Forms.TableLayoutPanel tableLayoutPanelFilters;
+        private readonly string _connectionString = "Server=YOUR_SERVER;Database=YOUR_DB;Trusted_Connection=True;TrustServerCertificate=True;";
+        private readonly string _apiUrl = "https://yourapi.com/data"; // base API URL (without trailing slash)
 
-        protected override void Dispose(bool disposing)
+        private readonly HttpClient _httpClient = new HttpClient();
+
+        public DataProcessorForm()
         {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
+            InitializeComponent();
+
+            // Set default combo selections (just in case)
+            cmbHasDelivery.SelectedIndex = 0;     // Any
+            cmbHasConfirmation.SelectedIndex = 0; // Any
+            cmbHasResponse.SelectedIndex = 0;     // Any
+
+            // Attach event handlers
+            btnLoadData.Click += BtnLoadData_Click;
+            btnApplyRegexFilter.Click += BtnApplyRegexFilter_Click;
+            btnProcessSelected.Click += BtnProcessSelected_Click;
         }
 
-        private void InitializeComponent()
+        private async void BtnLoadData_Click(object sender, EventArgs e)
         {
-            this.dataGridViewResults = new System.Windows.Forms.DataGridView();
-            this.cmbHasDelivery = new System.Windows.Forms.ComboBox();
-            this.cmbHasConfirmation = new System.Windows.Forms.ComboBox();
-            this.cmbHasResponse = new System.Windows.Forms.ComboBox();
-            this.lblHasDelivery = new System.Windows.Forms.Label();
-            this.lblHasConfirmation = new System.Windows.Forms.Label();
-            this.lblHasResponse = new System.Windows.Forms.Label();
-            this.txtRegexPattern = new System.Windows.Forms.TextBox();
-            this.lblRegexPattern = new System.Windows.Forms.Label();
-            this.btnLoadData = new System.Windows.Forms.Button();
-            this.btnApplyRegexFilter = new System.Windows.Forms.Button();
-            this.btnProcessSelected = new System.Windows.Forms.Button();
-            this.tableLayoutPanelFilters = new System.Windows.Forms.TableLayoutPanel();
-            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).BeginInit();
-            this.tableLayoutPanelFilters.SuspendLayout();
-            this.SuspendLayout();
-            // 
-            // tableLayoutPanelFilters
-            // 
-            this.tableLayoutPanelFilters.ColumnCount = 9;
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 110F)); // label HasDelivery
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 80F));  // cmbHasDelivery
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 130F)); // label HasConfirmation
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 80F));  // cmbHasConfirmation
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 110F)); // label HasResponse
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 80F));  // cmbHasResponse
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F)); // label Regex
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));   // txtRegexPattern
-            this.tableLayoutPanelFilters.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 120F)); // btnLoadData
-            this.tableLayoutPanelFilters.Controls.Add(this.lblHasDelivery, 0, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.cmbHasDelivery, 1, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.lblHasConfirmation, 2, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.cmbHasConfirmation, 3, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.lblHasResponse, 4, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.cmbHasResponse, 5, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.lblRegexPattern, 6, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.txtRegexPattern, 7, 0);
-            this.tableLayoutPanelFilters.Controls.Add(this.btnLoadData, 8, 0);
-            this.tableLayoutPanelFilters.Dock = System.Windows.Forms.DockStyle.Top;
-            this.tableLayoutPanelFilters.Location = new System.Drawing.Point(10, 10);
-            this.tableLayoutPanelFilters.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.tableLayoutPanelFilters.Name = "tableLayoutPanelFilters";
-            this.tableLayoutPanelFilters.RowCount = 1;
-            this.tableLayoutPanelFilters.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanelFilters.Size = new System.Drawing.Size(980, 40);
-            this.tableLayoutPanelFilters.TabIndex = 0;
-            // 
-            // lblHasDelivery
-            // 
-            this.lblHasDelivery.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.lblHasDelivery.AutoSize = true;
-            this.lblHasDelivery.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.lblHasDelivery.Location = new System.Drawing.Point(3, 12);
-            this.lblHasDelivery.Name = "lblHasDelivery";
-            this.lblHasDelivery.Size = new System.Drawing.Size(104, 17);
-            this.lblHasDelivery.TabIndex = 0;
-            this.lblHasDelivery.Text = "Has Delivery:";
-            // 
-            // cmbHasDelivery
-            // 
-            this.cmbHasDelivery.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.cmbHasDelivery.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasDelivery.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.cmbHasDelivery.FormattingEnabled = true;
-            this.cmbHasDelivery.Items.AddRange(new object[] {
-            "Any",
-            "Yes",
-            "No"});
-            this.cmbHasDelivery.Location = new System.Drawing.Point(113, 8);
-            this.cmbHasDelivery.Name = "cmbHasDelivery";
-            this.cmbHasDelivery.Size = new System.Drawing.Size(74, 25);
-            this.cmbHasDelivery.TabIndex = 1;
-            this.cmbHasDelivery.SelectedIndex = 0;
-            // 
-            // lblHasConfirmation
-            // 
-            this.lblHasConfirmation.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.lblHasConfirmation.AutoSize = true;
-            this.lblHasConfirmation.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.lblHasConfirmation.Location = new System.Drawing.Point(203, 12);
-            this.lblHasConfirmation.Name = "lblHasConfirmation";
-            this.lblHasConfirmation.Size = new System.Drawing.Size(124, 17);
-            this.lblHasConfirmation.TabIndex = 2;
-            this.lblHasConfirmation.Text = "Has Confirmation:";
-            // 
-            // cmbHasConfirmation
-            // 
-            this.cmbHasConfirmation.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.cmbHasConfirmation.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasConfirmation.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.cmbHasConfirmation.FormattingEnabled = true;
-            this.cmbHasConfirmation.Items.AddRange(new object[] {
-            "Any",
-            "Yes",
-            "No"});
-            this.cmbHasConfirmation.Location = new System.Drawing.Point(333, 8);
-            this.cmbHasConfirmation.Name = "cmbHasConfirmation";
-            this.cmbHasConfirmation.Size = new System.Drawing.Size(74, 25);
-            this.cmbHasConfirmation.TabIndex = 3;
-            this.cmbHasConfirmation.SelectedIndex = 0;
-            // 
-            // lblHasResponse
-            // 
-            this.lblHasResponse.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.lblHasResponse.AutoSize = true;
-            this.lblHasResponse.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.lblHasResponse.Location = new System.Drawing.Point(423, 12);
-            this.lblHasResponse.Name = "lblHasResponse";
-            this.lblHasResponse.Size = new System.Drawing.Size(100, 17);
-            this.lblHasResponse.TabIndex = 4;
-            this.lblHasResponse.Text = "Has Response:";
-            // 
-            // cmbHasResponse
-            // 
-            this.cmbHasResponse.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.cmbHasResponse.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasResponse.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.cmbHasResponse.FormattingEnabled = true;
-            this.cmbHasResponse.Items.AddRange(new object[] {
-            "Any",
-            "Yes",
-            "No"});
-            this.cmbHasResponse.Location = new System.Drawing.Point(529, 8);
-            this.cmbHasResponse.Name = "cmbHasResponse";
-            this.cmbHasResponse.Size = new System.Drawing.Size(74, 25);
-            this.cmbHasResponse.TabIndex = 5;
-            this.cmbHasResponse.SelectedIndex = 0;
-            // 
-            // lblRegexPattern
-            // 
-            this.lblRegexPattern.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.lblRegexPattern.AutoSize = true;
-            this.lblRegexPattern.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.lblRegexPattern.Location = new System.Drawing.Point(615, 12);
-            this.lblRegexPattern.Name = "lblRegexPattern";
-            this.lblRegexPattern.Size = new System.Drawing.Size(92, 17);
-            this.lblRegexPattern.TabIndex = 6;
-            this.lblRegexPattern.Text = "Regex Filter:";
-            // 
-            // txtRegexPattern
-            // 
-            this.txtRegexPattern.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtRegexPattern.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.txtRegexPattern.Location = new System.Drawing.Point(710, 8);
-            this.txtRegexPattern.Name = "txtRegexPattern";
-            this.txtRegexPattern.Size = new System.Drawing.Size(147, 25);
-            this.txtRegexPattern.TabIndex = 7;
-            // 
-            // btnLoadData
-            // 
-            this.btnLoadData.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.btnLoadData.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.btnLoadData.Location = new System.Drawing.Point(863, 6);
-            this.btnLoadData.Name = "btnLoadData";
-            this.btnLoadData.Size = new System.Drawing.Size(114, 28);
-            this.btnLoadData.TabIndex = 8;
-            this.btnLoadData.Text = "Load Data";
-            this.btnLoadData.UseVisualStyleBackColor = true;
-            // 
-            // btnApplyRegexFilter
-            // 
-            this.btnApplyRegexFilter.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.btnApplyRegexFilter.Location = new System.Drawing.Point(12, 60);
-            this.btnApplyRegexFilter.Name = "btnApplyRegexFilter";
-            this.btnApplyRegexFilter.Size = new System.Drawing.Size(140, 30);
-            this.btnApplyRegexFilter.TabIndex = 9;
-            this.btnApplyRegexFilter.Text = "Apply Regex Filter";
-            this.btnApplyRegexFilter.UseVisualStyleBackColor = true;
-            // 
-            // btnProcessSelected
-            // 
-            this.btnProcessSelected.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.btnProcessSelected.Location = new System.Drawing.Point(160, 60);
-            this.btnProcessSelected.Name = "btnProcessSelected";
-            this.btnProcessSelected.Size = new System.Drawing.Size(160, 30);
-            this.btnProcessSelected.TabIndex = 10;
-            this.btnProcessSelected.Text = "Process Selected Rows";
-            this.btnProcessSelected.UseVisualStyleBackColor = true;
-            // 
-            // dataGridViewResults
-            // 
-            this.dataGridViewResults.AllowUserToAddRows = false;
-            this.dataGridViewResults.AllowUserToDeleteRows = false;
-            this.dataGridViewResults.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-                                                                         | System.Windows.Forms.AnchorStyles.Left) 
-                                                                         | System.Windows.Forms.AnchorStyles.Right)));
-            this.dataGridViewResults.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            this.dataGridViewResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dataGridViewResults.Location = new System.Drawing.Point(10, 100);
-            this.dataGridViewResults.MultiSelect = true;
-            this.dataGridViewResults.Name = "dataGridViewResults";
-            this.dataGridViewResults.ReadOnly = true;
-            this.dataGridViewResults.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dataGridViewResults.Size = new System.Drawing.Size(980, 440);
-            this.dataGridViewResults.TabIndex = 11;
-            // 
-            // DataProcessorForm
-            // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1000, 560);
-            this.Controls.Add(this.dataGridViewResults);
-            this.Controls.Add(this.btnProcessSelected);
-            this.Controls.Add(this.btnApplyRegexFilter);
-            this.Controls.Add(this.tableLayoutPanelFilters);
-            this.Font = new System.Drawing.Font("Segoe UI", 12F);
-            this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.MinimumSize = new System.Drawing.Size(1020, 600);
-            this.Name = "DataProcessorForm";
-            this.Padding = new System.Windows.Forms.Padding(10);
-            this.Text = "Data Processor";
-            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).EndInit();
-            this.tableLayoutPanelFilters.ResumeLayout(false);
-            this.tableLayoutPanelFilters.PerformLayout();
-            this.ResumeLayout(false);
+            try
+            {
+                // Build WHERE clauses based on combo selections
+                var conditions = new List<string>();
 
+                if (cmbHasDelivery.SelectedItem?.ToString() == "Yes")
+                    conditions.Add("Has_Delivery = 1");
+                else if (cmbHasDelivery.SelectedItem?.ToString() == "No")
+                    conditions.Add("(Has_Delivery = 0 OR Has_Delivery IS NULL)");
+
+                if (cmbHasConfirmation.SelectedItem?.ToString() == "Yes")
+                    conditions.Add("Has_Confirmation = 1");
+                else if (cmbHasConfirmation.SelectedItem?.ToString() == "No")
+                    conditions.Add("(Has_Confirmation = 0 OR Has_Confirmation IS NULL)");
+
+                if (cmbHasResponse.SelectedItem?.ToString() == "Yes")
+                    conditions.Add("Has_Response = 1");
+                else if (cmbHasResponse.SelectedItem?.ToString() == "No")
+                    conditions.Add("(Has_Response = 0 OR Has_Response IS NULL)");
+
+                string whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
+
+                string sql = $"SELECT TOP 100000 * FROM YourLargeTable {whereClause}";
+
+                using var conn = new SqlConnection(_connectionString);
+                using var cmd = new SqlCommand(sql, conn);
+
+                await conn.OpenAsync();
+
+                var adapter = new SqlDataAdapter(cmd);
+                var dt = new DataTable();
+                adapter.Fill(dt);
+
+                dataGridViewResults.DataSource = dt;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading data:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnApplyRegexFilter_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string pattern = txtRegexPattern.Text.Trim();
+                if (string.IsNullOrWhiteSpace(pattern))
+                {
+                    MessageBox.Show("Please enter a regex pattern to filter.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (dataGridViewResults.DataSource is not DataTable dt)
+                {
+                    MessageBox.Show("No data loaded to filter.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                var filtered = dt.Clone(); // clone structure
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    foreach (var item in row.ItemArray)
+                    {
+                        if (Regex.IsMatch(item?.ToString() ?? string.Empty, pattern, RegexOptions.IgnoreCase))
+                        {
+                            filtered.ImportRow(row);
+                            break;
+                        }
+                    }
+                }
+
+                dataGridViewResults.DataSource = filtered;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error applying regex filter:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async void BtnProcessSelected_Click(object sender, EventArgs e)
+        {
+            if (dataGridViewResults.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Please select one or more rows to process.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            btnProcessSelected.Enabled = false;
+
+            try
+            {
+                foreach (DataGridViewRow row in dataGridViewResults.SelectedRows)
+                {
+                    if (row.Cells["Id"]?.Value == null)
+                        continue;
+
+                    string id = row.Cells["Id"].Value.ToString();
+                    string requestUrl = $"{_apiUrl}/{id}";
+
+                    try
+                    {
+                        var response = await _httpClient.GetAsync(requestUrl);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            MessageBox.Show($"API call failed for ID {id}: {response.StatusCode}", "API Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            continue;
+                        }
+
+                        var jsonString = await response.Content.ReadAsStringAsync();
+
+                        // Parse JSON dynamically using JsonNode
+                        var jsonNode = JsonNode.Parse(jsonString);
+
+                        // Save the raw JSON string to database
+                        await SaveApiResultToDatabaseAsync(id, jsonString);
+                    }
+                    catch (Exception apiEx)
+                    {
+                        MessageBox.Show($"Error calling API for ID {id}:\n{apiEx.Message}", "API Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+
+                MessageBox.Show("Selected rows processed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            finally
+            {
+                btnProcessSelected.Enabled = true;
+            }
+        }
+
+        private async Task SaveApiResultToDatabaseAsync(string id, string rawJson)
+        {
+            // Assume you have a table 'ProcessedResults' with columns:
+            // RecordId NVARCHAR, ResultJson NVARCHAR(MAX), ProcessedAt DATETIME
+            const string insertSql = @"
+                INSERT INTO ProcessedResults (RecordId, ResultJson, ProcessedAt)
+                VALUES (@RecordId, @ResultJson, @ProcessedAt)
+            ";
+
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(insertSql, conn);
+
+            cmd.Parameters.AddWithValue("@RecordId", id);
+            cmd.Parameters.AddWithValue("@ResultJson", rawJson);
+            cmd.Parameters.AddWithValue("@ProcessedAt", DateTime.UtcNow);
+
+            await conn.OpenAsync();
+            await cmd.ExecuteNonQueryAsync();
         }
     }
 }
