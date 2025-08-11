@@ -5,23 +5,26 @@ private async void BtnLoadData_Click(object sender, EventArgs e)
         var conditions = new List<string>();
 
         if (cmbHasDelivery.SelectedItem?.ToString() == "Yes")
-            conditions.Add("Has_Delivery = 1");
+            conditions.Add("Has_Delivery = 'YES'");
         else if (cmbHasDelivery.SelectedItem?.ToString() == "No")
-            conditions.Add("(Has_Delivery = 0 OR Has_Delivery IS NULL)");
+            conditions.Add("Has_Delivery = 'NO'");
 
         if (cmbHasConfirmation.SelectedItem?.ToString() == "Yes")
-            conditions.Add("Has_Confirmation = 1");
+            conditions.Add("Has_Confirmation = 'YES'");
         else if (cmbHasConfirmation.SelectedItem?.ToString() == "No")
-            conditions.Add("(Has_Confirmation = 0 OR Has_Confirmation IS NULL)");
+            conditions.Add("Has_Confirmation = 'NO'");
 
         if (cmbHasResponse.SelectedItem?.ToString() == "Yes")
-            conditions.Add("Has_Response = 1");
+            conditions.Add("Has_Response = 'YES'");
         else if (cmbHasResponse.SelectedItem?.ToString() == "No")
-            conditions.Add("(Has_Response = 0 OR Has_Response IS NULL)");
+            conditions.Add("Has_Response = 'NO'");
 
         string whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
-        string sql = $"SELECT TOP 100000 Id, Has_Delivery, Has_Confirmation, Has_Response FROM YourLargeTable {whereClause}";
+        string sql = $@"
+            SELECT TOP 100000 Id, Has_Delivery, Has_Confirmation, Has_Response
+            FROM YourLargeTable
+            {whereClause}";
 
         using var conn = new SqlConnection(_connectionString);
         using var cmd = new SqlCommand(sql, conn);
@@ -32,16 +35,25 @@ private async void BtnLoadData_Click(object sender, EventArgs e)
         var dt = new DataTable();
         adapter.Fill(dt);
 
-        // Adicionar coluna Status (para facilitar formatação)
+        // Adiciona coluna Status (string)
         if (!dt.Columns.Contains("Status"))
             dt.Columns.Add("Status", typeof(string));
 
         foreach (DataRow row in dt.Rows)
         {
             int yesCount = 0;
-            if (row["Has_Delivery"] != DBNull.Value && Convert.ToBoolean(row["Has_Delivery"])) yesCount++;
-            if (row["Has_Confirmation"] != DBNull.Value && Convert.ToBoolean(row["Has_Confirmation"])) yesCount++;
-            if (row["Has_Response"] != DBNull.Value && Convert.ToBoolean(row["Has_Response"])) yesCount++;
+
+            if (row["Has_Delivery"] != DBNull.Value &&
+                row["Has_Delivery"].ToString().Equals("YES", StringComparison.OrdinalIgnoreCase))
+                yesCount++;
+
+            if (row["Has_Confirmation"] != DBNull.Value &&
+                row["Has_Confirmation"].ToString().Equals("YES", StringComparison.OrdinalIgnoreCase))
+                yesCount++;
+
+            if (row["Has_Response"] != DBNull.Value &&
+                row["Has_Response"].ToString().Equals("YES", StringComparison.OrdinalIgnoreCase))
+                yesCount++;
 
             if (yesCount == 3)
                 row["Status"] = "Green";
@@ -60,3 +72,38 @@ private async void BtnLoadData_Click(object sender, EventArgs e)
         MessageBox.Show($"Error loading data:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }
+
+
+
+private void dataGridViewResults_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+{
+    if (dataGridViewResults.Columns[e.ColumnIndex].Name == "Status" && e.Value != null)
+    {
+        switch (e.Value.ToString())
+        {
+            case "Green":
+                e.CellStyle.BackColor = Color.LightGreen;
+                e.CellStyle.ForeColor = Color.Black;
+                break;
+            case "Yellow":
+                e.CellStyle.BackColor = Color.LightYellow;
+                e.CellStyle.ForeColor = Color.Black;
+                break;
+            case "Orange":
+                e.CellStyle.BackColor = Color.Orange;
+                e.CellStyle.ForeColor = Color.Black;
+                break;
+            case "Red":
+                e.CellStyle.BackColor = Color.LightCoral;
+                e.CellStyle.ForeColor = Color.White;
+                break;
+        }
+    }
+}
+
+
+
+
+this.dataGridViewResults.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dataGridViewResults_CellFormatting);
+
+
