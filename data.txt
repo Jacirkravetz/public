@@ -73,3 +73,83 @@ private async void BtnLoadData_Click(object sender, EventArgs e)
         MessageBox.Show($"Error loading data:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }
+
+
+private void InitializeComponent()
+{
+    this.dataGridViewResults = new System.Windows.Forms.DataGridView();
+    this.colStatus = new System.Windows.Forms.DataGridViewImageColumn();
+    ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).BeginInit();
+    this.SuspendLayout();
+    // 
+    // dataGridViewResults
+    // 
+    this.dataGridViewResults.AllowUserToAddRows = false;
+    this.dataGridViewResults.AllowUserToDeleteRows = false;
+    this.dataGridViewResults.AllowUserToResizeRows = false;
+    this.dataGridViewResults.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+    this.dataGridViewResults.BackgroundColor = System.Drawing.Color.White;
+    this.dataGridViewResults.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+    this.dataGridViewResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+    this.dataGridViewResults.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+        this.colStatus});
+    this.dataGridViewResults.Dock = System.Windows.Forms.DockStyle.Fill;
+    this.dataGridViewResults.GridColor = System.Drawing.Color.LightGray;
+    this.dataGridViewResults.Location = new System.Drawing.Point(0, 0);
+    this.dataGridViewResults.MultiSelect = true;
+    this.dataGridViewResults.Name = "dataGridViewResults";
+    this.dataGridViewResults.ReadOnly = true;
+    this.dataGridViewResults.RowHeadersVisible = false;
+    this.dataGridViewResults.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+    this.dataGridViewResults.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+    this.dataGridViewResults.Size = new System.Drawing.Size(1200, 600);
+    this.dataGridViewResults.TabIndex = 0;
+    // 
+    // colStatus
+    // 
+    this.colStatus.HeaderText = "Status";
+    this.colStatus.ImageLayout = System.Windows.Forms.DataGridViewImageCellLayout.Zoom;
+    this.colStatus.Name = "colStatus";
+    this.colStatus.ReadOnly = true;
+    this.colStatus.Width = 60;
+    // 
+    // DataProcessorForm
+    // 
+    this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
+    this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+    this.ClientSize = new System.Drawing.Size(1200, 600);
+    this.Controls.Add(this.dataGridViewResults);
+    this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+    this.MaximizeBox = true;
+    this.MinimizeBox = true;
+    this.Name = "DataProcessorForm";
+    this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+    this.Text = "Data Processor";
+    ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).EndInit();
+    this.ResumeLayout(false);
+}
+
+
+// Preencher coluna de status com ícones
+foreach (DataGridViewRow gridRow in dataGridViewResults.Rows)
+{
+    if (gridRow.DataBoundItem is DataRowView drv)
+    {
+        var row = drv.Row;
+
+        int yesCount = 0;
+        if (row["Has_Delivery"] != DBNull.Value && Convert.ToBoolean(row["Has_Delivery"])) yesCount++;
+        if (row["Has_Confirmation"] != DBNull.Value && Convert.ToBoolean(row["Has_Confirmation"])) yesCount++;
+        if (row["Has_Response"] != DBNull.Value && Convert.ToBoolean(row["Has_Response"])) yesCount++;
+
+        if (yesCount == 3)
+            gridRow.Cells["colStatus"].Value = Properties.Resources.GreenLight;
+        else if (yesCount == 2)
+            gridRow.Cells["colStatus"].Value = Properties.Resources.YellowLight;
+        else if (yesCount == 1)
+            gridRow.Cells["colStatus"].Value = Properties.Resources.OrangeLight;
+        else
+            gridRow.Cells["colStatus"].Value = Properties.Resources.RedLight;
+    }
+}
+
