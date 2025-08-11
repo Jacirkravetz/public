@@ -1,30 +1,168 @@
-// Bind to grid
-dataGridViewResults.AutoGenerateColumns = true;
-dataGridViewResults.DataSource = dt;
-
-// Garantir AutoSize para todas as colunas
-dataGridViewResults.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
-dataGridViewResults.ScrollBars = ScrollBars.Both;
-
-// Garantir que Status fique no início
-if (dataGridViewResults.Columns.Contains("Status"))
+namespace LogExtractorApp
 {
-    var col = dataGridViewResults.Columns["Status"];
-    col.DisplayIndex = 0; // primeira coluna
-    col.Width = 60; // largura mínima
-    col.SortMode = DataGridViewColumnSortMode.NotSortable;
-    col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+    partial class DataProcessorForm
+    {
+        private System.ComponentModel.IContainer components = null;
+
+        private System.Windows.Forms.DataGridView dataGridViewResults;
+        private System.Windows.Forms.Button btnLoadData;
+        private System.Windows.Forms.Button btnApplyRegexFilter;
+        private System.Windows.Forms.Button btnProcessSelected;
+        private System.Windows.Forms.TextBox txtRegexPattern;
+        private System.Windows.Forms.Label lblRegexPattern;
+
+        private System.Windows.Forms.Label lblHasDelivery;
+        private System.Windows.Forms.Label lblHasConfirmation;
+        private System.Windows.Forms.Label lblHasResponse;
+        private System.Windows.Forms.Label lblHasDeliveryDev;
+
+        private System.Windows.Forms.ComboBox cmbHasDelivery;
+        private System.Windows.Forms.ComboBox cmbHasConfirmation;
+        private System.Windows.Forms.ComboBox cmbHasResponse;
+        private System.Windows.Forms.ComboBox cmbHasDeliveryDev;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+        private void InitializeComponent()
+        {
+            this.dataGridViewResults = new System.Windows.Forms.DataGridView();
+            this.btnLoadData = new System.Windows.Forms.Button();
+            this.btnApplyRegexFilter = new System.Windows.Forms.Button();
+            this.btnProcessSelected = new System.Windows.Forms.Button();
+            this.txtRegexPattern = new System.Windows.Forms.TextBox();
+            this.lblRegexPattern = new System.Windows.Forms.Label();
+
+            this.lblHasDelivery = new System.Windows.Forms.Label();
+            this.lblHasConfirmation = new System.Windows.Forms.Label();
+            this.lblHasResponse = new System.Windows.Forms.Label();
+            this.lblHasDeliveryDev = new System.Windows.Forms.Label();
+
+            this.cmbHasDelivery = new System.Windows.Forms.ComboBox();
+            this.cmbHasConfirmation = new System.Windows.Forms.ComboBox();
+            this.cmbHasResponse = new System.Windows.Forms.ComboBox();
+            this.cmbHasDeliveryDev = new System.Windows.Forms.ComboBox();
+
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).BeginInit();
+            this.SuspendLayout();
+
+            // DataGridView
+            this.dataGridViewResults.AllowUserToAddRows = false;
+            this.dataGridViewResults.AllowUserToDeleteRows = false;
+            this.dataGridViewResults.AllowUserToResizeRows = false;
+            this.dataGridViewResults.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.dataGridViewResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridViewResults.MultiSelect = true;
+            this.dataGridViewResults.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            this.dataGridViewResults.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dataGridViewResults.ReadOnly = true;
+            this.dataGridViewResults.Location = new System.Drawing.Point(12, 120);
+            this.dataGridViewResults.Size = new System.Drawing.Size(960, 480);
+            this.dataGridViewResults.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+                        | System.Windows.Forms.AnchorStyles.Left)
+                        | System.Windows.Forms.AnchorStyles.Right)));
+
+            // lblHasDelivery
+            this.lblHasDelivery.AutoSize = true;
+            this.lblHasDelivery.Location = new System.Drawing.Point(12, 15);
+            this.lblHasDelivery.Text = "Has Delivery:";
+
+            // cmbHasDelivery
+            this.cmbHasDelivery.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbHasDelivery.Items.AddRange(new object[] { "", "Yes", "No" });
+            this.cmbHasDelivery.Location = new System.Drawing.Point(100, 12);
+            this.cmbHasDelivery.Width = 80;
+
+            // lblHasConfirmation
+            this.lblHasConfirmation.AutoSize = true;
+            this.lblHasConfirmation.Location = new System.Drawing.Point(200, 15);
+            this.lblHasConfirmation.Text = "Has Confirmation:";
+
+            // cmbHasConfirmation
+            this.cmbHasConfirmation.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbHasConfirmation.Items.AddRange(new object[] { "", "Yes", "No" });
+            this.cmbHasConfirmation.Location = new System.Drawing.Point(320, 12);
+            this.cmbHasConfirmation.Width = 80;
+
+            // lblHasResponse
+            this.lblHasResponse.AutoSize = true;
+            this.lblHasResponse.Location = new System.Drawing.Point(420, 15);
+            this.lblHasResponse.Text = "Has Response:";
+
+            // cmbHasResponse
+            this.cmbHasResponse.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbHasResponse.Items.AddRange(new object[] { "", "Yes", "No" });
+            this.cmbHasResponse.Location = new System.Drawing.Point(520, 12);
+            this.cmbHasResponse.Width = 80;
+
+            // lblHasDeliveryDev
+            this.lblHasDeliveryDev.AutoSize = true;
+            this.lblHasDeliveryDev.Location = new System.Drawing.Point(620, 15);
+            this.lblHasDeliveryDev.Text = "Has Delivery DEV:";
+
+            // cmbHasDeliveryDev
+            this.cmbHasDeliveryDev.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbHasDeliveryDev.Items.AddRange(new object[] { "", "Yes", "No" });
+            this.cmbHasDeliveryDev.Location = new System.Drawing.Point(750, 12);
+            this.cmbHasDeliveryDev.Width = 80;
+
+            // lblRegexPattern
+            this.lblRegexPattern.AutoSize = true;
+            this.lblRegexPattern.Location = new System.Drawing.Point(12, 50);
+            this.lblRegexPattern.Text = "Regex Filter:";
+
+            // txtRegexPattern
+            this.txtRegexPattern.Location = new System.Drawing.Point(100, 47);
+            this.txtRegexPattern.Width = 250;
+
+            // btnLoadData
+            this.btnLoadData.Location = new System.Drawing.Point(370, 45);
+            this.btnLoadData.Text = "Load Data";
+            this.btnLoadData.Click += new System.EventHandler(this.BtnLoadData_Click);
+
+            // btnApplyRegexFilter
+            this.btnApplyRegexFilter.Location = new System.Drawing.Point(470, 45);
+            this.btnApplyRegexFilter.Text = "Apply Regex Filter";
+            this.btnApplyRegexFilter.Click += new System.EventHandler(this.BtnApplyRegexFilter_Click);
+
+            // btnProcessSelected
+            this.btnProcessSelected.Location = new System.Drawing.Point(620, 45);
+            this.btnProcessSelected.Text = "Process Selected";
+            this.btnProcessSelected.Click += new System.EventHandler(this.BtnProcessSelected_Click);
+
+            // Form
+            this.ClientSize = new System.Drawing.Size(984, 611);
+            this.Controls.Add(this.dataGridViewResults);
+            this.Controls.Add(this.lblHasDelivery);
+            this.Controls.Add(this.cmbHasDelivery);
+            this.Controls.Add(this.lblHasConfirmation);
+            this.Controls.Add(this.cmbHasConfirmation);
+            this.Controls.Add(this.lblHasResponse);
+            this.Controls.Add(this.cmbHasResponse);
+            this.Controls.Add(this.lblHasDeliveryDev);
+            this.Controls.Add(this.cmbHasDeliveryDev);
+            this.Controls.Add(this.lblRegexPattern);
+            this.Controls.Add(this.txtRegexPattern);
+            this.Controls.Add(this.btnLoadData);
+            this.Controls.Add(this.btnApplyRegexFilter);
+            this.Controls.Add(this.btnProcessSelected);
+            this.Name = "DataProcessorForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "Data Processor";
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+        }
+        #endregion
+    }
 }
-
-
-this.dataGridViewResults = new System.Windows.Forms.DataGridView();
-this.dataGridViewResults.AllowUserToAddRows = false;
-this.dataGridViewResults.AllowUserToDeleteRows = false;
-this.dataGridViewResults.AllowUserToResizeRows = false;
-this.dataGridViewResults.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
-this.dataGridViewResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-this.dataGridViewResults.MultiSelect = true;
-this.dataGridViewResults.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-this.dataGridViewResults.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-this.dataGridViewResults.ReadOnly = true;
-this.dataGridViewResults.Dock = System.Windows.Forms.DockStyle.Fill;
