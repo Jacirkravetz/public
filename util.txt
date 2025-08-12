@@ -1,9 +1,105 @@
+// WorkflowDashboard.Designer.cs
+using System.Windows.Forms;
+
 namespace WorkflowMonitor
 {
     partial class WorkflowDashboard
     {
         private System.ComponentModel.IContainer components = null;
 
+        // Header / summary
+        private Panel headerPanel;
+        private TableLayoutPanel tlpSummaryCards;
+        private Panel cardPipelines;
+        private Label lblCardPipelinesTitle;
+        private Label lblCardPipelinesValue;
+        private Panel cardSteps;
+        private Label lblCardStepsTitle;
+        private Label lblCardStepsValue;
+        private Panel cardSuccess;
+        private Label lblCardSuccessTitle;
+        private Label lblCardSuccessValue;
+        private Panel cardErrors;
+        private Label lblCardErrorsTitle;
+        private Label lblCardErrorsValue;
+        private Panel cardPending;
+        private Label lblCardPendingTitle;
+        private Label lblCardPendingValue;
+
+        // Top controls / filters
+        private Panel topControlsPanel;
+        private Label lblDate;
+        private DateTimePicker dtpRunDate;
+        private Label lblEnvironment;
+        private ComboBox cmbEnvironment;
+        private Label lblPipelineFilter;
+        private TextBox txtPipelineFilter;
+        private Button btnSearch;
+        private Button btnRefresh;
+        private Button btnExport;
+        private Button btnCloseDay;
+
+        // Main layout
+        private SplitContainer mainSplit; // left: workflow canvas, right: details
+        private Panel leftCanvasPanel;     // workflow canvas container (with scroll)
+        private FlowLayoutPanel flowWorkflows; // holds pipeline panels (workflow cards)
+        private Panel canvasToolbar;      // zoom, layout toggle, legend
+        private Button btnZoomIn;
+        private Button btnZoomOut;
+        private Button btnLayoutToggle;
+        private Panel legendPanel;
+
+        // Right details pane
+        private Panel rightDetailsPanel;
+        private TabControl tabDetails;
+        private TabPage tabOverview;
+        private TabPage tabSteps;
+        private TabPage tabLogs;
+        private TabPage tabActions;
+
+        // Overview tab contents
+        private Panel overviewPanel;
+        private DataGridView dgvPipelines; // summary grid in overview
+        private BindingSource pipelinesBinding;
+
+        // Steps tab
+        private Panel stepsPanel;
+        private DataGridView dgvSteps;
+        private BindingSource stepsBinding;
+        private FlowLayoutPanel stepActionButtonsPanel;
+        private Button btnRetryStep;
+        private Button btnReprocessPipeline;
+        private Button btnAcknowledge;
+
+        // Logs tab
+        private Panel logsPanel;
+        private TextBox txtLogDetails;
+        private Button btnOpenLogFile;
+
+        // Actions tab (Day Closure / Actions)
+        private Panel actionsPanel;
+        private DataGridView dgvActions;
+        private BindingSource actionsBinding;
+        private Button btnCreateIncident;
+        private Button btnAssignAction;
+        private Button btnResolveAction;
+
+        // Bottom status strip
+        private StatusStrip statusStrip;
+        private ToolStripStatusLabel tsslStatus;
+        private ToolStripProgressBar tspbProgress;
+        private ToolStripStatusLabel tsslLastRefresh;
+
+        // Modal overlay for long-running ops
+        private Panel pnlModalOverlay;
+        private Panel pnlModalBox;
+        private Label lblModalTitle;
+        private ProgressBar modalProgressBar;
+        private Button btnModalCancel;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -13,111 +109,499 @@ namespace WorkflowMonitor
             base.Dispose(disposing);
         }
 
+        #region Windows Form Designer generated code
+
         private void InitializeComponent()
         {
-            this.headerPanel = new System.Windows.Forms.Panel();
-            this.lblPipelines = new System.Windows.Forms.Label();
-            this.lblSteps = new System.Windows.Forms.Label();
-            this.lblSuccess = new System.Windows.Forms.Label();
-            this.lblErrors = new System.Windows.Forms.Label();
-            this.lblPending = new System.Windows.Forms.Label();
-            this.flowWorkflows = new System.Windows.Forms.FlowLayoutPanel();
-            this.detailsPanel = new System.Windows.Forms.Panel();
-            this.txtDetails = new System.Windows.Forms.TextBox();
-            this.statusStrip = new System.Windows.Forms.StatusStrip();
-            this.lblLastUpdate = new System.Windows.Forms.ToolStripStatusLabel();
+            this.components = new System.ComponentModel.Container();
 
-            // Header
-            this.headerPanel.Dock = System.Windows.Forms.DockStyle.Top;
-            this.headerPanel.Height = 80;
-            this.headerPanel.BackColor = System.Drawing.Color.FromArgb(240, 240, 240);
-            this.headerPanel.Padding = new System.Windows.Forms.Padding(10);
+            // ========== Header / Summary Cards ==========
+            this.headerPanel = new Panel();
+            this.tlpSummaryCards = new TableLayoutPanel();
+            this.cardPipelines = new Panel();
+            this.lblCardPipelinesTitle = new Label();
+            this.lblCardPipelinesValue = new Label();
+            this.cardSteps = new Panel();
+            this.lblCardStepsTitle = new Label();
+            this.lblCardStepsValue = new Label();
+            this.cardSuccess = new Panel();
+            this.lblCardSuccessTitle = new Label();
+            this.lblCardSuccessValue = new Label();
+            this.cardErrors = new Panel();
+            this.lblCardErrorsTitle = new Label();
+            this.lblCardErrorsValue = new Label();
+            this.cardPending = new Panel();
+            this.lblCardPendingTitle = new Label();
+            this.lblCardPendingValue = new Label();
 
-            var headerFlow = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight
-            };
-            headerFlow.Controls.Add(CreateCard("Pipelines", out lblPipelines));
-            headerFlow.Controls.Add(CreateCard("Steps", out lblSteps));
-            headerFlow.Controls.Add(CreateCard("Sucesso", out lblSuccess));
-            headerFlow.Controls.Add(CreateCard("Erros", out lblErrors));
-            headerFlow.Controls.Add(CreateCard("Pendentes", out lblPending));
-            this.headerPanel.Controls.Add(headerFlow);
+            // top controls
+            this.topControlsPanel = new Panel();
+            this.lblDate = new Label();
+            this.dtpRunDate = new DateTimePicker();
+            this.lblEnvironment = new Label();
+            this.cmbEnvironment = new ComboBox();
+            this.lblPipelineFilter = new Label();
+            this.txtPipelineFilter = new TextBox();
+            this.btnSearch = new Button();
+            this.btnRefresh = new Button();
+            this.btnExport = new Button();
+            this.btnCloseDay = new Button();
 
-            // Workflows area
-            this.flowWorkflows.Dock = DockStyle.Fill;
-            this.flowWorkflows.Padding = new Padding(10);
-            this.flowWorkflows.BackColor = Color.WhiteSmoke;
-            this.flowWorkflows.AutoScroll = true;
+            // main split
+            this.mainSplit = new SplitContainer();
+            this.leftCanvasPanel = new Panel();
+            this.canvasToolbar = new Panel();
+            this.btnZoomIn = new Button();
+            this.btnZoomOut = new Button();
+            this.btnLayoutToggle = new Button();
+            this.legendPanel = new Panel();
+            this.flowWorkflows = new FlowLayoutPanel();
 
-            // Details panel
-            this.detailsPanel.Dock = DockStyle.Right;
-            this.detailsPanel.Width = 250;
-            this.detailsPanel.BackColor = Color.White;
-            this.detailsPanel.Padding = new Padding(10);
+            // right details
+            this.rightDetailsPanel = new Panel();
+            this.tabDetails = new TabControl();
+            this.tabOverview = new TabPage();
+            this.tabSteps = new TabPage();
+            this.tabLogs = new TabPage();
+            this.tabActions = new TabPage();
 
-            this.txtDetails.Multiline = true;
-            this.txtDetails.Dock = DockStyle.Fill;
-            this.txtDetails.ReadOnly = true;
-            this.detailsPanel.Controls.Add(this.txtDetails);
+            // overview grid
+            this.overviewPanel = new Panel();
+            this.dgvPipelines = new DataGridView();
+            this.pipelinesBinding = new BindingSource(this.components);
 
-            // StatusStrip
-            this.statusStrip.Items.Add(this.lblLastUpdate);
-            this.statusStrip.Dock = DockStyle.Bottom;
+            // steps tab
+            this.stepsPanel = new Panel();
+            this.dgvSteps = new DataGridView();
+            this.stepsBinding = new BindingSource(this.components);
+            this.stepActionButtonsPanel = new FlowLayoutPanel();
+            this.btnRetryStep = new Button();
+            this.btnReprocessPipeline = new Button();
+            this.btnAcknowledge = new Button();
 
-            // Form
-            this.Text = "Workflow Dashboard";
-            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
-            this.Controls.Add(this.flowWorkflows);
-            this.Controls.Add(this.detailsPanel);
+            // logs tab
+            this.logsPanel = new Panel();
+            this.txtLogDetails = new TextBox();
+            this.btnOpenLogFile = new Button();
+
+            // actions tab
+            this.actionsPanel = new Panel();
+            this.dgvActions = new DataGridView();
+            this.actionsBinding = new BindingSource(this.components);
+            this.btnCreateIncident = new Button();
+            this.btnAssignAction = new Button();
+            this.btnResolveAction = new Button();
+
+            // status strip
+            this.statusStrip = new StatusStrip();
+            this.tsslStatus = new ToolStripStatusLabel();
+            this.tspbProgress = new ToolStripProgressBar();
+            this.tsslLastRefresh = new ToolStripStatusLabel();
+
+            // modal overlay
+            this.pnlModalOverlay = new Panel();
+            this.pnlModalBox = new Panel();
+            this.lblModalTitle = new Label();
+            this.modalProgressBar = new ProgressBar();
+            this.btnModalCancel = new Button();
+
+            // ========== Form properties ==========
+            this.SuspendLayout();
+            this.Text = "Workflow Dashboard - Integration Overview";
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.MinimumSize = new System.Drawing.Size(1280, 800);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+
+            // ========== Header panel ==========
+            this.headerPanel.Dock = DockStyle.Top;
+            this.headerPanel.Height = 140;
+            this.headerPanel.Padding = new Padding(12);
+            this.headerPanel.BackColor = System.Drawing.Color.FromArgb(250, 250, 250);
+
+            // summary cards layout
+            this.tlpSummaryCards.Dock = DockStyle.Top;
+            this.tlpSummaryCards.RowCount = 1;
+            this.tlpSummaryCards.ColumnCount = 5;
+            this.tlpSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            this.tlpSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            this.tlpSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            this.tlpSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            this.tlpSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            this.tlpSummaryCards.Height = 80;
+            this.tlpSummaryCards.Padding = new Padding(6);
+            this.headerPanel.Controls.Add(this.tlpSummaryCards);
+
+            // card: Pipelines
+            this.cardPipelines.Dock = DockStyle.Fill;
+            this.cardPipelines.Margin = new Padding(6);
+            this.cardPipelines.Padding = new Padding(10);
+            this.cardPipelines.BackColor = System.Drawing.Color.White;
+            this.cardPipelines.BorderStyle = BorderStyle.FixedSingle;
+            this.lblCardPipelinesTitle.Text = "Pipelines";
+            this.lblCardPipelinesTitle.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular);
+            this.lblCardPipelinesTitle.Dock = DockStyle.Top;
+            this.lblCardPipelinesValue.Text = "0";
+            this.lblCardPipelinesValue.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
+            this.lblCardPipelinesValue.Dock = DockStyle.Fill;
+            this.lblCardPipelinesValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.cardPipelines.Controls.Add(this.lblCardPipelinesValue);
+            this.cardPipelines.Controls.Add(this.lblCardPipelinesTitle);
+            this.tlpSummaryCards.Controls.Add(this.cardPipelines, 0, 0);
+
+            // card: Steps
+            this.cardSteps.Dock = DockStyle.Fill;
+            this.cardSteps.Margin = new Padding(6);
+            this.cardSteps.Padding = new Padding(10);
+            this.cardSteps.BackColor = System.Drawing.Color.White;
+            this.cardSteps.BorderStyle = BorderStyle.FixedSingle;
+            this.lblCardStepsTitle.Text = "Steps";
+            this.lblCardStepsTitle.Dock = DockStyle.Top;
+            this.lblCardStepsValue.Text = "0";
+            this.lblCardStepsValue.Dock = DockStyle.Fill;
+            this.lblCardStepsValue.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
+            this.lblCardStepsValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.cardSteps.Controls.Add(this.lblCardStepsValue);
+            this.cardSteps.Controls.Add(this.lblCardStepsTitle);
+            this.tlpSummaryCards.Controls.Add(this.cardSteps, 1, 0);
+
+            // card: Success
+            this.cardSuccess.Dock = DockStyle.Fill;
+            this.cardSuccess.Margin = new Padding(6);
+            this.cardSuccess.Padding = new Padding(10);
+            this.cardSuccess.BackColor = System.Drawing.Color.White;
+            this.cardSuccess.BorderStyle = BorderStyle.FixedSingle;
+            this.lblCardSuccessTitle.Text = "Success";
+            this.lblCardSuccessTitle.Dock = DockStyle.Top;
+            this.lblCardSuccessValue.Text = "0";
+            this.lblCardSuccessValue.Dock = DockStyle.Fill;
+            this.lblCardSuccessValue.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
+            this.lblCardSuccessValue.ForeColor = System.Drawing.Color.FromArgb(0, 120, 0);
+            this.lblCardSuccessValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.cardSuccess.Controls.Add(this.lblCardSuccessValue);
+            this.cardSuccess.Controls.Add(this.lblCardSuccessTitle);
+            this.tlpSummaryCards.Controls.Add(this.cardSuccess, 2, 0);
+
+            // card: Errors
+            this.cardErrors.Dock = DockStyle.Fill;
+            this.cardErrors.Margin = new Padding(6);
+            this.cardErrors.Padding = new Padding(10);
+            this.cardErrors.BackColor = System.Drawing.Color.White;
+            this.cardErrors.BorderStyle = BorderStyle.FixedSingle;
+            this.lblCardErrorsTitle.Text = "Errors";
+            this.lblCardErrorsTitle.Dock = DockStyle.Top;
+            this.lblCardErrorsValue.Text = "0";
+            this.lblCardErrorsValue.Dock = DockStyle.Fill;
+            this.lblCardErrorsValue.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
+            this.lblCardErrorsValue.ForeColor = System.Drawing.Color.FromArgb(192, 0, 0);
+            this.lblCardErrorsValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.cardErrors.Controls.Add(this.lblCardErrorsValue);
+            this.cardErrors.Controls.Add(this.lblCardErrorsTitle);
+            this.tlpSummaryCards.Controls.Add(this.cardErrors, 3, 0);
+
+            // card: Pending
+            this.cardPending.Dock = DockStyle.Fill;
+            this.cardPending.Margin = new Padding(6);
+            this.cardPending.Padding = new Padding(10);
+            this.cardPending.BackColor = System.Drawing.Color.White;
+            this.cardPending.BorderStyle = BorderStyle.FixedSingle;
+            this.lblCardPendingTitle.Text = "Pending";
+            this.lblCardPendingTitle.Dock = DockStyle.Top;
+            this.lblCardPendingValue.Text = "0";
+            this.lblCardPendingValue.Dock = DockStyle.Fill;
+            this.lblCardPendingValue.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
+            this.lblCardPendingValue.ForeColor = System.Drawing.Color.FromArgb(255, 140, 0);
+            this.lblCardPendingValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.cardPending.Controls.Add(this.lblCardPendingValue);
+            this.cardPending.Controls.Add(this.lblCardPendingTitle);
+            this.tlpSummaryCards.Controls.Add(this.cardPending, 4, 0);
+
+            // ========== Top controls (filters / actions) ==========
+            this.topControlsPanel.Dock = DockStyle.Top;
+            this.topControlsPanel.Height = 48;
+            this.topControlsPanel.Padding = new Padding(8);
+            this.topControlsPanel.BackColor = System.Drawing.Color.Transparent;
+            this.headerPanel.Controls.Add(this.topControlsPanel);
+
+            // date
+            this.lblDate.Text = "Date:";
+            this.lblDate.AutoSize = true;
+            this.lblDate.Location = new System.Drawing.Point(12, 90);
+            this.topControlsPanel.Controls.Add(this.lblDate);
+
+            this.dtpRunDate.Format = DateTimePickerFormat.Short;
+            this.dtpRunDate.Location = new System.Drawing.Point(60, 86);
+            this.topControlsPanel.Controls.Add(this.dtpRunDate);
+
+            // environment
+            this.lblEnvironment.Text = "Environment:";
+            this.lblEnvironment.AutoSize = true;
+            this.lblEnvironment.Location = new System.Drawing.Point(180, 90);
+            this.topControlsPanel.Controls.Add(this.lblEnvironment);
+
+            this.cmbEnvironment.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbEnvironment.Items.AddRange(new object[] { "ALL", "PROD", "QA", "DEV" });
+            this.cmbEnvironment.Location = new System.Drawing.Point(270, 86);
+            this.cmbEnvironment.Width = 100;
+            this.topControlsPanel.Controls.Add(this.cmbEnvironment);
+
+            // pipeline filter
+            this.lblPipelineFilter.Text = "Pipeline:";
+            this.lblPipelineFilter.AutoSize = true;
+            this.lblPipelineFilter.Location = new System.Drawing.Point(390, 90);
+            this.topControlsPanel.Controls.Add(this.lblPipelineFilter);
+
+            this.txtPipelineFilter.PlaceholderText = "Filter by name/origin/target";
+            this.txtPipelineFilter.Location = new System.Drawing.Point(450, 86);
+            this.txtPipelineFilter.Width = 240;
+            this.topControlsPanel.Controls.Add(this.txtPipelineFilter);
+
+            // buttons
+            this.btnSearch.Text = "Search";
+            this.btnSearch.Location = new System.Drawing.Point(700, 84);
+            this.btnSearch.Width = 80;
+            this.topControlsPanel.Controls.Add(this.btnSearch);
+
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.Location = new System.Drawing.Point(790, 84);
+            this.btnRefresh.Width = 80;
+            this.topControlsPanel.Controls.Add(this.btnRefresh);
+
+            this.btnExport.Text = "Export";
+            this.btnExport.Location = new System.Drawing.Point(880, 84);
+            this.btnExport.Width = 80;
+            this.topControlsPanel.Controls.Add(this.btnExport);
+
+            this.btnCloseDay.Text = "Close Day";
+            this.btnCloseDay.Location = new System.Drawing.Point(970, 84);
+            this.btnCloseDay.Width = 120;
+            this.btnCloseDay.BackColor = System.Drawing.Color.FromArgb(0, 120, 215);
+            this.btnCloseDay.ForeColor = System.Drawing.Color.White;
+            this.topControlsPanel.Controls.Add(this.btnCloseDay);
+
+            // add header
             this.Controls.Add(this.headerPanel);
+
+            // ========== Main split: left canvas, right details ==========
+            this.mainSplit.Dock = DockStyle.Fill;
+            this.mainSplit.Orientation = Orientation.Horizontal;
+            this.mainSplit.SplitterDistance = 600;
+            this.mainSplit.Panel1MinSize = 400;
+            this.mainSplit.Panel2MinSize = 200;
+            // Note: avoid conflicting min sizes; adjust at runtime if needed.
+
+            // leftCanvasPanel (workflow)
+            this.leftCanvasPanel.Dock = DockStyle.Fill;
+            this.leftCanvasPanel.Padding = new Padding(12);
+            this.leftCanvasPanel.BackColor = System.Drawing.Color.FromArgb(245, 247, 250);
+
+            // canvas toolbar (zoom, layout, legend)
+            this.canvasToolbar.Dock = DockStyle.Top;
+            this.canvasToolbar.Height = 44;
+            this.canvasToolbar.Padding = new Padding(6);
+            this.canvasToolbar.BackColor = System.Drawing.Color.Transparent;
+            this.leftCanvasPanel.Controls.Add(this.canvasToolbar);
+
+            this.btnZoomIn.Text = "+";
+            this.btnZoomIn.Width = 34;
+            this.canvasToolbar.Controls.Add(this.btnZoomIn);
+
+            this.btnZoomOut.Text = "−";
+            this.btnZoomOut.Width = 34;
+            this.canvasToolbar.Controls.Add(this.btnZoomOut);
+
+            this.btnLayoutToggle.Text = "Layout";
+            this.btnLayoutToggle.Width = 80;
+            this.canvasToolbar.Controls.Add(this.btnLayoutToggle);
+
+            // Legend: small colored indicators with labels
+            this.legendPanel.Dock = DockStyle.Right;
+            this.legendPanel.Width = 250;
+            this.legendPanel.Padding = new Padding(8);
+            this.legendPanel.BackColor = System.Drawing.Color.WhiteSmoke;
+            var lblLegendTitle = new Label { Text = "Legend", Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold), Dock = DockStyle.Top, Height = 20 };
+            this.legendPanel.Controls.Add(lblLegendTitle);
+
+            // create legend items (panels + labels)
+            var legendItems = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoScroll = true };
+            legendItems.Padding = new Padding(6);
+
+            legendItems.Controls.Add(CreateLegendItem(System.Drawing.Color.FromArgb(0, 153, 51), "Success"));
+            legendItems.Controls.Add(CreateLegendItem(System.Drawing.Color.Goldenrod, "Partial / Attention"));
+            legendItems.Controls.Add(CreateLegendItem(System.Drawing.Color.Orange, "Pending"));
+            legendItems.Controls.Add(CreateLegendItem(System.Drawing.Color.Firebrick, "Error"));
+            legendItems.Controls.Add(CreateLegendItem(System.Drawing.Color.DodgerBlue, "Processing"));
+
+            this.legendPanel.Controls.Add(legendItems);
+            this.leftCanvasPanel.Controls.Add(this.legendPanel);
+
+            // flowWorkflows: holds pipeline visual cards
+            this.flowWorkflows.Dock = DockStyle.Fill;
+            this.flowWorkflows.AutoScroll = true;
+            this.flowWorkflows.FlowDirection = FlowDirection.TopDown;
+            this.flowWorkflows.WrapContents = false;
+            this.flowWorkflows.Padding = new Padding(6);
+            this.leftCanvasPanel.Controls.Add(this.flowWorkflows);
+
+            // put leftCanvasPanel into mainSplit.Panel1
+            this.mainSplit.Panel1.Controls.Add(this.leftCanvasPanel);
+
+            // rightDetailsPanel
+            this.rightDetailsPanel.Dock = DockStyle.Fill;
+            this.rightDetailsPanel.Padding = new Padding(12);
+            this.rightDetailsPanel.BackColor = System.Drawing.Color.White;
+
+            // tab control
+            this.tabDetails.Dock = DockStyle.Fill;
+            this.tabDetails.TabIndex = 0;
+            this.tabDetails.Controls.Add(this.tabOverview);
+            this.tabDetails.Controls.Add(this.tabSteps);
+            this.tabDetails.Controls.Add(this.tabLogs);
+            this.tabDetails.Controls.Add(this.tabActions);
+
+            // Overview tab - pipelines grid
+            this.tabOverview.Text = "Overview";
+            this.overviewPanel.Dock = DockStyle.Fill;
+            this.overviewPanel.Padding = new Padding(6);
+            this.dgvPipelines.Dock = DockStyle.Fill;
+            this.dgvPipelines.ReadOnly = true;
+            this.dgvPipelines.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            this.dgvPipelines.MultiSelect = true;
+            this.dgvPipelines.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+            this.dgvPipelines.AllowUserToAddRows = false;
+            this.dgvPipelines.AllowUserToDeleteRows = false;
+            this.overviewPanel.Controls.Add(this.dgvPipelines);
+            this.tabOverview.Controls.Add(this.overviewPanel);
+
+            // Steps tab
+            this.tabSteps.Text = "Steps";
+            this.stepsPanel.Dock = DockStyle.Fill;
+            this.stepsPanel.Padding = new Padding(6);
+            this.dgvSteps.Dock = DockStyle.Fill;
+            this.dgvSteps.ReadOnly = true;
+            this.dgvSteps.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            this.dgvSteps.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+            this.dgvSteps.AllowUserToAddRows = false;
+            this.stepsPanel.Controls.Add(this.dgvSteps);
+
+            // step action buttons
+            this.stepActionButtonsPanel.Dock = DockStyle.Bottom;
+            this.stepActionButtonsPanel.Height = 44;
+            this.stepActionButtonsPanel.FlowDirection = FlowDirection.LeftToRight;
+            this.stepActionButtonsPanel.Padding = new Padding(6);
+            this.btnRetryStep.Text = "Retry Step";
+            this.btnRetryStep.Width = 120;
+            this.btnReprocessPipeline.Text = "Reprocess Pipeline";
+            this.btnReprocessPipeline.Width = 160;
+            this.btnAcknowledge.Text = "Acknowledge";
+            this.btnAcknowledge.Width = 120;
+            this.stepActionButtonsPanel.Controls.Add(this.btnRetryStep);
+            this.stepActionButtonsPanel.Controls.Add(this.btnReprocessPipeline);
+            this.stepActionButtonsPanel.Controls.Add(this.btnAcknowledge);
+            this.tabSteps.Controls.Add(this.stepsPanel);
+            this.tabSteps.Controls.Add(this.stepActionButtonsPanel);
+
+            // Logs tab
+            this.tabLogs.Text = "Logs";
+            this.logsPanel.Dock = DockStyle.Fill;
+            this.logsPanel.Padding = new Padding(6);
+            this.txtLogDetails.Dock = DockStyle.Fill;
+            this.txtLogDetails.Multiline = true;
+            this.txtLogDetails.ScrollBars = ScrollBars.Both;
+            this.txtLogDetails.ReadOnly = true;
+            this.btnOpenLogFile.Text = "Open Log File";
+            this.btnOpenLogFile.Dock = DockStyle.Bottom;
+            this.logsPanel.Controls.Add(this.txtLogDetails);
+            this.logsPanel.Controls.Add(this.btnOpenLogFile);
+            this.tabLogs.Controls.Add(this.logsPanel);
+
+            // Actions tab
+            this.tabActions.Text = "Day Actions";
+            this.actionsPanel.Dock = DockStyle.Fill;
+            this.actionsPanel.Padding = new Padding(6);
+            this.dgvActions.Dock = DockStyle.Fill;
+            this.dgvActions.ReadOnly = false;
+            this.dgvActions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            this.dgvActions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+            this.dgvActions.AllowUserToAddRows = false;
+            this.actionsPanel.Controls.Add(this.dgvActions);
+
+            // actions buttons
+            var actionsButtonsPanel = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(6) };
+            this.btnCreateIncident.Text = "Create Incident";
+            this.btnCreateIncident.Width = 140;
+            this.btnAssignAction.Text = "Assign";
+            this.btnAssignAction.Width = 120;
+            this.btnResolveAction.Text = "Mark Resolved";
+            this.btnResolveAction.Width = 120;
+            actionsButtonsPanel.Controls.Add(this.btnCreateIncident);
+            actionsButtonsPanel.Controls.Add(this.btnAssignAction);
+            actionsButtonsPanel.Controls.Add(this.btnResolveAction);
+            this.tabActions.Controls.Add(this.actionsPanel);
+            this.tabActions.Controls.Add(actionsButtonsPanel);
+
+            // add tabDetails to rightDetailsPanel
+            this.rightDetailsPanel.Controls.Add(this.tabDetails);
+
+            // put rightDetailsPanel into mainSplit.Panel2
+            this.mainSplit.Panel2.Controls.Add(this.rightDetailsPanel);
+
+            // add mainSplit to form
+            this.Controls.Add(this.mainSplit);
+
+            // ========== Status strip ==========
+            this.statusStrip.Dock = DockStyle.Bottom;
+            this.tsslStatus.Text = "Ready";
+            this.tsslLastRefresh.Text = "Last refresh: -";
+            this.tspbProgress.Visible = false;
+            this.statusStrip.Items.AddRange(new ToolStripItem[] { this.tsslStatus, this.tspbProgress, this.tsslLastRefresh });
             this.Controls.Add(this.statusStrip);
+
+            // ========== Modal overlay ==========
+            this.pnlModalOverlay.Dock = DockStyle.Fill;
+            this.pnlModalOverlay.BackColor = System.Drawing.Color.FromArgb(120, 0, 0, 0);
+            this.pnlModalOverlay.Visible = false;
+            this.pnlModalOverlay.Controls.Add(this.pnlModalBox);
+
+            this.pnlModalBox.Width = 520;
+            this.pnlModalBox.Height = 160;
+            this.pnlModalBox.BackColor = System.Drawing.Color.White;
+            this.pnlModalBox.BorderStyle = BorderStyle.FixedSingle;
+            this.pnlModalBox.Controls.Add(this.lblModalTitle);
+            this.pnlModalBox.Controls.Add(this.modalProgressBar);
+            this.pnlModalBox.Controls.Add(this.btnModalCancel);
+
+            this.lblModalTitle.Text = "Processing...";
+            this.lblModalTitle.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblModalTitle.Location = new System.Drawing.Point(12, 12);
+            this.modalProgressBar.Location = new System.Drawing.Point(12, 44);
+            this.modalProgressBar.Width = 480;
+            this.modalProgressBar.Style = ProgressBarStyle.Marquee;
+            this.btnModalCancel.Text = "Cancel";
+            this.btnModalCancel.Location = new System.Drawing.Point(400, 100);
+            this.btnModalCancel.Width = 80;
+
+            // center modal box (positioned at runtime in resized event)
+            this.pnlModalOverlay.Visible = false;
+            this.Controls.Add(this.pnlModalOverlay);
+
+            // finalize layout
+            this.ResumeLayout(false);
+            this.PerformLayout();
         }
 
-        private Panel CreateCard(string title, out Label valueLabel)
+        #endregion
+
+        // helper to create legend item (small colored square + label)
+        private Control CreateLegendItem(System.Drawing.Color color, string text)
         {
-            var panel = new Panel
-            {
-                Width = 120,
-                Height = 60,
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle,
-                Margin = new Padding(5)
-            };
-
-            var lblTitle = new Label
-            {
-                Text = title,
-                Dock = DockStyle.Top,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
-            };
-
-            valueLabel = new Label
-            {
-                Text = "0",
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
-                ForeColor = Color.FromArgb(50, 50, 50)
-            };
-
-            panel.Controls.Add(valueLabel);
-            panel.Controls.Add(lblTitle);
+            var panel = new Panel { Height = 28, Dock = DockStyle.Top, Padding = new Padding(4) };
+            var colorBox = new Panel { Width = 18, Height = 18, BackColor = color, Margin = new Padding(4), BorderStyle = BorderStyle.FixedSingle };
+            var lbl = new Label { Text = text, AutoSize = true, TextAlign = System.Drawing.ContentAlignment.MiddleLeft, Dock = DockStyle.Fill, Padding = new Padding(6, 2, 0, 0) };
+            panel.Controls.Add(colorBox);
+            panel.Controls.Add(lbl);
+            colorBox.Dock = DockStyle.Left;
+            lbl.Dock = DockStyle.Fill;
             return panel;
         }
-
-        private System.Windows.Forms.Panel headerPanel;
-        private System.Windows.Forms.Label lblPipelines;
-        private System.Windows.Forms.Label lblSteps;
-        private System.Windows.Forms.Label lblSuccess;
-        private System.Windows.Forms.Label lblErrors;
-        private System.Windows.Forms.Label lblPending;
-        private System.Windows.Forms.FlowLayoutPanel flowWorkflows;
-        private System.Windows.Forms.Panel detailsPanel;
-        private System.Windows.Forms.TextBox txtDetails;
-        private System.Windows.Forms.StatusStrip statusStrip;
-        private System.Windows.Forms.ToolStripStatusLabel lblLastUpdate;
     }
 }
