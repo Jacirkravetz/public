@@ -1,42 +1,9 @@
-// DayClosureForm.Designer.cs
-namespace IntegrationDashboard
+namespace WorkflowMonitor
 {
-    partial class DayClosureForm
+    partial class WorkflowDashboard
     {
         private System.ComponentModel.IContainer components = null;
 
-        private System.Windows.Forms.Panel headerPanel;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.DateTimePicker dtpRunDate;
-        private System.Windows.Forms.Button btnGenerateActions;
-        private System.Windows.Forms.Button btnFinalize;
-        private System.Windows.Forms.Button btnExportReport;
-
-        private System.Windows.Forms.SplitContainer mainSplit;
-        private System.Windows.Forms.DataGridView gvPipelines;
-        private System.Windows.Forms.DataGridView gvActions;
-        private System.Windows.Forms.Panel pnlSummary;
-        private System.Windows.Forms.Label lblTotalPipelines;
-        private System.Windows.Forms.Label lblAllConfirmed;
-        private System.Windows.Forms.Label lblWithErrors;
-        private System.Windows.Forms.Label lblPendingRecords;
-        private System.Windows.Forms.Button btnCreateIncident;
-        private System.Windows.Forms.Button btnMarkResolved;
-        private System.Windows.Forms.Button btnAssign;
-        private System.Windows.Forms.StatusStrip statusStrip;
-        private System.Windows.Forms.ToolStripStatusLabel tsslInfo;
-        private System.Windows.Forms.ToolStripProgressBar tspb;
-
-        // modal
-        private System.Windows.Forms.Panel modalOverlay;
-        private System.Windows.Forms.Panel modalPanel;
-        private System.Windows.Forms.Label lblModalTitle;
-        private System.Windows.Forms.ProgressBar modalProgress;
-        private System.Windows.Forms.Button btnModalCancel;
-
-        /// <summary>
-        /// Dispose.
-        /// </summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -48,166 +15,109 @@ namespace IntegrationDashboard
 
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
+            this.headerPanel = new System.Windows.Forms.Panel();
+            this.lblPipelines = new System.Windows.Forms.Label();
+            this.lblSteps = new System.Windows.Forms.Label();
+            this.lblSuccess = new System.Windows.Forms.Label();
+            this.lblErrors = new System.Windows.Forms.Label();
+            this.lblPending = new System.Windows.Forms.Label();
+            this.flowWorkflows = new System.Windows.Forms.FlowLayoutPanel();
+            this.detailsPanel = new System.Windows.Forms.Panel();
+            this.txtDetails = new System.Windows.Forms.TextBox();
+            this.statusStrip = new System.Windows.Forms.StatusStrip();
+            this.lblLastUpdate = new System.Windows.Forms.ToolStripStatusLabel();
 
             // Header
-            this.headerPanel = new System.Windows.Forms.Panel();
-            this.lblTitle = new System.Windows.Forms.Label();
-            this.dtpRunDate = new System.Windows.Forms.DateTimePicker();
-            this.btnGenerateActions = new System.Windows.Forms.Button();
-            this.btnFinalize = new System.Windows.Forms.Button();
-            this.btnExportReport = new System.Windows.Forms.Button();
-
-            // Summary + main split
-            this.pnlSummary = new System.Windows.Forms.Panel();
-            this.lblTotalPipelines = new System.Windows.Forms.Label();
-            this.lblAllConfirmed = new System.Windows.Forms.Label();
-            this.lblWithErrors = new System.Windows.Forms.Label();
-            this.lblPendingRecords = new System.Windows.Forms.Label();
-
-            this.mainSplit = new System.Windows.Forms.SplitContainer();
-            this.gvPipelines = new System.Windows.Forms.DataGridView();
-            this.gvActions = new System.Windows.Forms.DataGridView();
-
-            // action buttons
-            this.btnCreateIncident = new System.Windows.Forms.Button();
-            this.btnMarkResolved = new System.Windows.Forms.Button();
-            this.btnAssign = new System.Windows.Forms.Button();
-
-            // status strip
-            this.statusStrip = new System.Windows.Forms.StatusStrip();
-            this.tsslInfo = new System.Windows.Forms.ToolStripStatusLabel();
-            this.tspb = new System.Windows.Forms.ToolStripProgressBar();
-
-            // modal
-            this.modalOverlay = new System.Windows.Forms.Panel();
-            this.modalPanel = new System.Windows.Forms.Panel();
-            this.lblModalTitle = new System.Windows.Forms.Label();
-            this.modalProgress = new System.Windows.Forms.ProgressBar();
-            this.btnModalCancel = new System.Windows.Forms.Button();
-
-            // Header layout
             this.headerPanel.Dock = System.Windows.Forms.DockStyle.Top;
-            this.headerPanel.Height = 84;
-            this.headerPanel.Padding = new System.Windows.Forms.Padding(12);
-            this.headerPanel.BackColor = System.Drawing.Color.FromArgb(245, 245, 245);
+            this.headerPanel.Height = 80;
+            this.headerPanel.BackColor = System.Drawing.Color.FromArgb(240, 240, 240);
+            this.headerPanel.Padding = new System.Windows.Forms.Padding(10);
 
-            this.lblTitle.Text = "Day Closure Assistant";
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.AutoSize = true;
-            this.lblTitle.Location = new System.Drawing.Point(12, 8);
+            var headerFlow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight
+            };
+            headerFlow.Controls.Add(CreateCard("Pipelines", out lblPipelines));
+            headerFlow.Controls.Add(CreateCard("Steps", out lblSteps));
+            headerFlow.Controls.Add(CreateCard("Sucesso", out lblSuccess));
+            headerFlow.Controls.Add(CreateCard("Erros", out lblErrors));
+            headerFlow.Controls.Add(CreateCard("Pendentes", out lblPending));
+            this.headerPanel.Controls.Add(headerFlow);
 
-            this.dtpRunDate.Format = System.Windows.Forms.DateTimePickerFormat.Short;
-            this.dtpRunDate.Location = new System.Drawing.Point(12, 42);
+            // Workflows area
+            this.flowWorkflows.Dock = DockStyle.Fill;
+            this.flowWorkflows.Padding = new Padding(10);
+            this.flowWorkflows.BackColor = Color.WhiteSmoke;
+            this.flowWorkflows.AutoScroll = true;
 
-            this.btnGenerateActions.Text = "Generate Actions";
-            this.btnGenerateActions.Location = new System.Drawing.Point(180, 40);
-            this.btnGenerateActions.Width = 140;
+            // Details panel
+            this.detailsPanel.Dock = DockStyle.Right;
+            this.detailsPanel.Width = 250;
+            this.detailsPanel.BackColor = Color.White;
+            this.detailsPanel.Padding = new Padding(10);
 
-            this.btnExportReport.Text = "Export Report";
-            this.btnExportReport.Location = new System.Drawing.Point(330, 40);
-            this.btnExportReport.Width = 110;
+            this.txtDetails.Multiline = true;
+            this.txtDetails.Dock = DockStyle.Fill;
+            this.txtDetails.ReadOnly = true;
+            this.detailsPanel.Controls.Add(this.txtDetails);
 
-            this.btnFinalize.Text = "Finalize Closure";
-            this.btnFinalize.Location = new System.Drawing.Point(450, 40);
-            this.btnFinalize.BackColor = System.Drawing.Color.FromArgb(0, 123, 215);
-            this.btnFinalize.ForeColor = System.Drawing.Color.White;
-            this.btnFinalize.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnFinalize.Width = 140;
+            // StatusStrip
+            this.statusStrip.Items.Add(this.lblLastUpdate);
+            this.statusStrip.Dock = DockStyle.Bottom;
 
-            this.headerPanel.Controls.Add(this.lblTitle);
-            this.headerPanel.Controls.Add(this.dtpRunDate);
-            this.headerPanel.Controls.Add(this.btnGenerateActions);
-            this.headerPanel.Controls.Add(this.btnExportReport);
-            this.headerPanel.Controls.Add(this.btnFinalize);
-
-            // Summary
-            this.pnlSummary.Dock = System.Windows.Forms.DockStyle.Top;
-            this.pnlSummary.Height = 60;
-            this.pnlSummary.Padding = new System.Windows.Forms.Padding(12);
-            this.pnlSummary.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.pnlSummary.Controls.Add(this.lblTotalPipelines);
-            this.pnlSummary.Controls.Add(this.lblAllConfirmed);
-            this.pnlSummary.Controls.Add(this.lblWithErrors);
-            this.pnlSummary.Controls.Add(this.lblPendingRecords);
-
-            this.lblTotalPipelines.Text = "Pipelines: 0";
-            this.lblTotalPipelines.Location = new System.Drawing.Point(12, 10);
-            this.lblAllConfirmed.Text = "All Confirmed: 0";
-            this.lblAllConfirmed.Location = new System.Drawing.Point(140, 10);
-            this.lblWithErrors.Text = "With Errors: 0";
-            this.lblWithErrors.Location = new System.Drawing.Point(320, 10);
-            this.lblPendingRecords.Text = "Pending Records: 0";
-            this.lblPendingRecords.Location = new System.Drawing.Point(460, 10);
-
-            // mainSplit
-            this.mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.mainSplit.SplitterDistance = 480;
-            this.mainSplit.Panel1MinSize = 320;
-            this.mainSplit.Panel2MinSize = 420;
-
-            // gvPipelines panel (left)
-            this.gvPipelines.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.gvPipelines.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
-            this.gvPipelines.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.gvPipelines.MultiSelect = false;
-            this.gvPipelines.ReadOnly = true;
-            this.mainSplit.Panel1.Controls.Add(this.gvPipelines);
-
-            // gvActions (right)
-            this.gvActions.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.gvActions.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
-            this.gvActions.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.gvActions.MultiSelect = true;
-            this.mainSplit.Panel2.Controls.Add(this.gvActions);
-
-            // action buttons below actions grid
-            this.btnCreateIncident.Text = "Create Incident";
-            this.btnCreateIncident.Location = new System.Drawing.Point(12, 360);
-            this.btnMarkResolved.Text = "Mark Resolved";
-            this.btnMarkResolved.Location = new System.Drawing.Point(140, 360);
-            this.btnAssign.Text = "Assign";
-            this.btnAssign.Location = new System.Drawing.Point(260, 360);
-            this.mainSplit.Panel2.Controls.Add(this.btnCreateIncident);
-            this.mainSplit.Panel2.Controls.Add(this.btnMarkResolved);
-            this.mainSplit.Panel2.Controls.Add(this.btnAssign);
-
-            // status strip
-            this.statusStrip.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { this.tsslInfo, this.tspb });
-            this.tsslInfo.Text = "Ready";
-            this.tspb.Visible = false;
-
-            // modal overlay
-            this.modalOverlay.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.modalOverlay.Visible = false;
-            this.modalOverlay.BackColor = System.Drawing.Color.FromArgb(120, 0, 0, 0);
-            this.modalOverlay.Controls.Add(this.modalPanel);
-            this.modalPanel.BackColor = System.Drawing.Color.White;
-            this.modalPanel.Width = 520;
-            this.modalPanel.Height = 140;
-            this.modalPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.modalPanel.Controls.Add(this.lblModalTitle);
-            this.modalPanel.Controls.Add(this.modalProgress);
-            this.modalPanel.Controls.Add(this.btnModalCancel);
-            this.lblModalTitle.Text = "Processing...";
-            this.lblModalTitle.Location = new System.Drawing.Point(12, 8);
-            this.modalProgress.Location = new System.Drawing.Point(12, 44);
-            this.modalProgress.Width = 480;
-            this.modalProgress.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
-            this.btnModalCancel.Text = "Cancel";
-            this.btnModalCancel.Location = new System.Drawing.Point(400, 88);
-
-            // Compose form
-            this.Controls.Add(this.mainSplit);
-            this.Controls.Add(this.pnlSummary);
+            // Form
+            this.Text = "Workflow Dashboard";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.Controls.Add(this.flowWorkflows);
+            this.Controls.Add(this.detailsPanel);
             this.Controls.Add(this.headerPanel);
             this.Controls.Add(this.statusStrip);
-            this.Controls.Add(this.modalOverlay);
-
-            this.Text = "Day Closure Assistant";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.MinimumSize = new System.Drawing.Size(1200, 760);
         }
+
+        private Panel CreateCard(string title, out Label valueLabel)
+        {
+            var panel = new Panel
+            {
+                Width = 120,
+                Height = 60,
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Margin = new Padding(5)
+            };
+
+            var lblTitle = new Label
+            {
+                Text = title,
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            };
+
+            valueLabel = new Label
+            {
+                Text = "0",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                ForeColor = Color.FromArgb(50, 50, 50)
+            };
+
+            panel.Controls.Add(valueLabel);
+            panel.Controls.Add(lblTitle);
+            return panel;
+        }
+
+        private System.Windows.Forms.Panel headerPanel;
+        private System.Windows.Forms.Label lblPipelines;
+        private System.Windows.Forms.Label lblSteps;
+        private System.Windows.Forms.Label lblSuccess;
+        private System.Windows.Forms.Label lblErrors;
+        private System.Windows.Forms.Label lblPending;
+        private System.Windows.Forms.FlowLayoutPanel flowWorkflows;
+        private System.Windows.Forms.Panel detailsPanel;
+        private System.Windows.Forms.TextBox txtDetails;
+        private System.Windows.Forms.StatusStrip statusStrip;
+        private System.Windows.Forms.ToolStripStatusLabel lblLastUpdate;
     }
 }
