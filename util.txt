@@ -495,3 +495,181 @@ namespace IntegrationDashboard
             });
 
             this.tabSteps.Controls.Add(this.gvSteps);
+
+            // action buttons on steps tab
+            this.btnRetryStep.Text = "Retry Step";
+            this.btnRetryStep.Location = new System.Drawing.Point(10, 280);
+            this.btnRetryStep.Width = 120;
+            this.btnAcknowledge.Text = "Acknowledge";
+            this.btnAcknowledge.Location = new System.Drawing.Point(140, 280);
+            this.btnAcknowledge.Width = 140;
+
+            this.tabSteps.Controls.Add(this.btnRetryStep);
+            this.tabSteps.Controls.Add(this.btnAcknowledge);
+
+            // Timeline tab
+            this.tabTimeline.Text = "Timeline / Progress";
+            this.tabTimeline.Controls.Add(this.pnlTimeline);
+            this.pnlTimeline.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlTimeline.Padding = new System.Windows.Forms.Padding(8);
+            this.pnlTimeline.Controls.Add(this.lblTimelineHint);
+            this.pnlTimeline.Controls.Add(this.pbOverallProgress);
+
+            this.lblTimelineHint.Text = "Pipeline runtime visualization and step progress";
+            this.lblTimelineHint.Dock = System.Windows.Forms.DockStyle.Top;
+            this.pbOverallProgress.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.pbOverallProgress.Height = 24;
+
+            // Errors tab
+            this.tabErrors.Text = "Errors";
+            this.tabErrors.Padding = new System.Windows.Forms.Padding(8);
+            this.tabErrors.Controls.Add(this.gvErrors);
+            this.tabErrors.Controls.Add(this.btnViewErrorDetails);
+
+            this.gvErrors.Dock = System.Windows.Forms.DockStyle.Top;
+            this.gvErrors.Height = 300;
+            this.gvErrors.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.gvErrors.ReadOnly = true;
+            this.gvErrors.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.gvErrors.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+                this.colErrorId,
+                this.colErrorPipeline,
+                this.colErrorStep,
+                this.colErrorMessage,
+                this.colErrorTime,
+                this.colErrorResolved
+            });
+
+            this.btnViewErrorDetails.Text = "View Error Details";
+            this.btnViewErrorDetails.Location = new System.Drawing.Point(10, 320);
+            this.btnViewErrorDetails.Width = 160;
+
+            // Metrics tab
+            this.tabMetrics.Text = "Metrics";
+            this.tabMetrics.Padding = new System.Windows.Forms.Padding(8);
+            this.tabMetrics.Controls.Add(this.chartMetrics);
+            this.tabMetrics.Controls.Add(this.pnlMetricsSummary);
+
+            this.chartMetrics.Dock = System.Windows.Forms.DockStyle.Fill;
+            // Note: chart requires reference to System.Windows.Forms.DataVisualization
+
+            this.pnlMetricsSummary.Dock = System.Windows.Forms.DockStyle.Top;
+            this.pnlMetricsSummary.Height = 80;
+            this.pnlMetricsSummary.Controls.Add(this.lblMetricTotalReceived);
+            this.pnlMetricsSummary.Controls.Add(this.lblMetricTotalProcessed);
+            this.pnlMetricsSummary.Controls.Add(this.lblMetricTotalFailed);
+
+            this.lblMetricTotalReceived.AutoSize = true;
+            this.lblMetricTotalReceived.Location = new System.Drawing.Point(8, 8);
+            this.lblMetricTotalReceived.Text = "Received: 0";
+
+            this.lblMetricTotalProcessed.AutoSize = true;
+            this.lblMetricTotalProcessed.Location = new System.Drawing.Point(200, 8);
+            this.lblMetricTotalProcessed.Text = "Processed: 0";
+
+            this.lblMetricTotalFailed.AutoSize = true;
+            this.lblMetricTotalFailed.Location = new System.Drawing.Point(400, 8);
+            this.lblMetricTotalFailed.Text = "Failed: 0";
+
+            // -----------------------------
+            // Status strip (bottom)
+            // -----------------------------
+            this.statusStrip.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.tsslStatus,
+                this.tssProgress
+            });
+            this.tsslStatus.Text = "Ready";
+            this.tssProgress.Size = new System.Drawing.Size(200, 16);
+            this.tssProgress.Visible = false;
+
+            // -----------------------------
+            // Modal overlays (hidden)
+            // -----------------------------
+            this.pnlModalOverlay.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlModalOverlay.BackColor = System.Drawing.Color.FromArgb(120, 0, 0, 0);
+            this.pnlModalOverlay.Visible = false; // shown programmatically
+            this.pnlModalOverlay.Padding = new System.Windows.Forms.Padding(50);
+
+            // Progress modal
+            this.pnlProgressModal.BackColor = System.Drawing.Color.White;
+            this.pnlProgressModal.Width = 500;
+            this.pnlProgressModal.Height = 150;
+            this.pnlProgressModal.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlProgressModal.Controls.Add(this.lblProgressTitle);
+            this.pnlProgressModal.Controls.Add(this.pbModal);
+            this.pnlProgressModal.Controls.Add(this.btnModalCancel);
+
+            this.lblProgressTitle.Text = "Processing...";
+            this.lblProgressTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+            this.lblProgressTitle.Location = new System.Drawing.Point(16, 12);
+            this.pbModal.Location = new System.Drawing.Point(16, 48);
+            this.pbModal.Width = 460;
+            this.pbModal.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
+            this.btnModalCancel.Text = "Cancel";
+            this.btnModalCancel.Location = new System.Drawing.Point(380, 100);
+            this.btnModalCancel.Width = 90;
+
+            // Error modal
+            this.pnlErrorModal.BackColor = System.Drawing.Color.White;
+            this.pnlErrorModal.Width = 700;
+            this.pnlErrorModal.Height = 400;
+            this.pnlErrorModal.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.txtModalErrorDetails.Dock = System.Windows.Forms.DockStyle.Top;
+            this.txtModalErrorDetails.Multiline = true;
+            this.txtModalErrorDetails.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtModalErrorDetails.Height = 340;
+            this.btnCloseErrorModal.Text = "Close";
+            this.btnCloseErrorModal.Location = new System.Drawing.Point(600, 350);
+
+            this.pnlModalOverlay.Controls.Add(this.pnlProgressModal);
+            this.pnlModalOverlay.Controls.Add(this.pnlErrorModal);
+            this.pnlErrorModal.Controls.Add(this.txtModalErrorDetails);
+            this.pnlErrorModal.Controls.Add(this.btnCloseErrorModal);
+
+            // -----------------------------
+            // Compose form's controls
+            // -----------------------------
+            // Place main panels into mainSplit
+            this.mainSplit.Panel1.Controls.Add(this.pnlLeft);
+            this.mainSplit.Panel2.Controls.Add(this.rightSplit);
+
+            // Place top header + mainSplit + status into form
+            this.Controls.Add(this.mainSplit);
+            this.Controls.Add(this.pnlHeader);
+            this.Controls.Add(this.statusStrip);
+            this.Controls.Add(this.pnlModalOverlay);
+
+            // final form properties
+            this.Text = "Integration Pipeline Dashboard";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.MinimumSize = new System.Drawing.Size(1200, 760);
+
+            // Resume layout
+            this.pnlHeader.ResumeLayout(false);
+            this.pnlHeader.PerformLayout();
+            this.pnlLeft.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.gvPipelines)).EndInit();
+            this.rightSplit.Panel1.ResumeLayout(false);
+            this.rightSplit.Panel2.ResumeLayout(false);
+            this.rightSplit.ResumeLayout(false);
+            this.mainSplit.Panel1.ResumeLayout(false);
+            this.mainSplit.Panel2.ResumeLayout(false);
+            this.mainSplit.ResumeLayout(false);
+            this.tabDetails.ResumeLayout(false);
+            this.tabSteps.ResumeLayout(false);
+            this.tabTimeline.ResumeLayout(false);
+            this.tabErrors.ResumeLayout(false);
+            this.tabMetrics.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.gvSteps)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.gvErrors)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.chartMetrics)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pipelinesBindingSource)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.stepsBindingSource)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.errorsBindingSource)).EndInit();
+        }
+
+        #endregion
+    }
+}
