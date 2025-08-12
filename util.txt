@@ -1,0 +1,497 @@
+// DataIntegrationDashboardForm.Designer.cs
+namespace IntegrationDashboard
+{
+    partial class DataIntegrationDashboardForm
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        // Top area
+        private System.Windows.Forms.Panel pnlHeader;
+        private System.Windows.Forms.Label lblTitle;
+        private System.Windows.Forms.DateTimePicker dtpDate;
+        private System.Windows.Forms.Label lblDate;
+        private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnCloseDay;
+        private System.Windows.Forms.Button btnExportCsv;
+        private System.Windows.Forms.Button btnOpenLogs;
+        private System.Windows.Forms.Button btnCreateIncident;
+        private System.Windows.Forms.ToolTip toolTip;
+
+        // Layout
+        private System.Windows.Forms.SplitContainer mainSplit; // left: pipelines tree, right: main content
+        private System.Windows.Forms.SplitContainer rightSplit; // top: pipelines grid, bottom: details/tabs
+
+        // Left pane: pipelines navigation
+        private System.Windows.Forms.Panel pnlLeft;
+        private System.Windows.Forms.Label lblPipelines;
+        private System.Windows.Forms.TreeView treePipelines;
+        private System.Windows.Forms.Button btnExpandAll;
+        private System.Windows.Forms.Button btnCollapseAll;
+        private System.Windows.Forms.TextBox txtPipelineSearch;
+
+        // Filters row above grid
+        private System.Windows.Forms.Panel pnlFilters;
+        private System.Windows.Forms.ComboBox cmbStatusFilter; // All / Success / Partial / Failed
+        private System.Windows.Forms.Label lblStatusFilter;
+        private System.Windows.Forms.ComboBox cmbEnvironment; // Prod / Dev / QA
+        private System.Windows.Forms.Label lblEnvironment;
+        private System.Windows.Forms.TextBox txtQuickSearch;
+        private System.Windows.Forms.Label lblQuickSearch;
+        private System.Windows.Forms.Button btnApplyFilters;
+        private System.Windows.Forms.Button btnClearFilters;
+
+        // Top-right: pipelines summary grid
+        private System.Windows.Forms.DataGridView gvPipelines;
+        private System.Windows.Forms.BindingSource pipelinesBindingSource;
+
+        // Bottom-right: tab control with Steps, Timeline, Errors, Metrics
+        private System.Windows.Forms.TabControl tabDetails;
+        private System.Windows.Forms.TabPage tabSteps;
+        private System.Windows.Forms.TabPage tabTimeline;
+        private System.Windows.Forms.TabPage tabErrors;
+        private System.Windows.Forms.TabPage tabMetrics;
+
+        // Steps tab
+        private System.Windows.Forms.DataGridView gvSteps;
+        private System.Windows.Forms.BindingSource stepsBindingSource;
+        private System.Windows.Forms.Button btnRetryStep;
+        private System.Windows.Forms.Button btnAcknowledge;
+
+        // Timeline tab (simple visual placeholders - can be enhanced with chart lib)
+        private System.Windows.Forms.Panel pnlTimeline;
+        private System.Windows.Forms.Label lblTimelineHint;
+        private System.Windows.Forms.ProgressBar pbOverallProgress;
+
+        // Errors tab
+        private System.Windows.Forms.DataGridView gvErrors;
+        private System.Windows.Forms.BindingSource errorsBindingSource;
+        private System.Windows.Forms.Button btnViewErrorDetails;
+
+        // Metrics tab
+        private System.Windows.Forms.DataVisualization.Charting.Chart chartMetrics; // optional (add reference to System.Windows.Forms.DataVisualization)
+        private System.Windows.Forms.Panel pnlMetricsSummary;
+        private System.Windows.Forms.Label lblMetricTotalReceived;
+        private System.Windows.Forms.Label lblMetricTotalProcessed;
+        private System.Windows.Forms.Label lblMetricTotalFailed;
+
+        // Bottom status strip
+        private System.Windows.Forms.StatusStrip statusStrip;
+        private System.Windows.Forms.ToolStripStatusLabel tsslStatus;
+        private System.Windows.Forms.ToolStripProgressBar tssProgress;
+
+        // Overlay modal panels (hidden by default)
+        private System.Windows.Forms.Panel pnlModalOverlay;
+        private System.Windows.Forms.Panel pnlProgressModal;
+        private System.Windows.Forms.Label lblProgressTitle;
+        private System.Windows.Forms.ProgressBar pbModal;
+        private System.Windows.Forms.Button btnModalCancel;
+        private System.Windows.Forms.Panel pnlErrorModal;
+        private System.Windows.Forms.TextBox txtModalErrorDetails;
+        private System.Windows.Forms.Button btnCloseErrorModal;
+
+        // Columns definitions for gvPipelines (for clarity in designer)
+        private System.Windows.Forms.DataGridViewTextBoxColumn colPipelineName;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colPipelineStatus;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colReceived;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colProcessed;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colFailed;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colLastRun;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colDuration;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colOwner;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colTargetSystem;
+
+        // Steps grid columns
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStepName;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStepStatus;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStepStart;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStepEnd;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStepDuration;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStepError;
+
+        // Errors grid columns
+        private System.Windows.Forms.DataGridViewTextBoxColumn colErrorId;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colErrorPipeline;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colErrorStep;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colErrorMessage;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colErrorTime;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colErrorResolved;
+
+        /// <summary>
+        /// Clean up resources.
+        /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+                _disposeChart();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void _disposeChart()
+        {
+            try { chartMetrics?.Dispose(); } catch { }
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Designer initializer
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+            var resources = new System.ComponentModel.ComponentResourceManager(typeof(DataIntegrationDashboardForm));
+            this.toolTip = new System.Windows.Forms.ToolTip(this.components);
+
+            // Header
+            this.pnlHeader = new System.Windows.Forms.Panel();
+            this.lblTitle = new System.Windows.Forms.Label();
+            this.lblDate = new System.Windows.Forms.Label();
+            this.dtpDate = new System.Windows.Forms.DateTimePicker();
+            this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnCloseDay = new System.Windows.Forms.Button();
+            this.btnExportCsv = new System.Windows.Forms.Button();
+            this.btnOpenLogs = new System.Windows.Forms.Button();
+            this.btnCreateIncident = new System.Windows.Forms.Button();
+
+            // Layout split containers
+            this.mainSplit = new System.Windows.Forms.SplitContainer();
+            this.rightSplit = new System.Windows.Forms.SplitContainer();
+
+            // Left pane (pipelines navigation)
+            this.pnlLeft = new System.Windows.Forms.Panel();
+            this.lblPipelines = new System.Windows.Forms.Label();
+            this.txtPipelineSearch = new System.Windows.Forms.TextBox();
+            this.treePipelines = new System.Windows.Forms.TreeView();
+            this.btnExpandAll = new System.Windows.Forms.Button();
+            this.btnCollapseAll = new System.Windows.Forms.Button();
+
+            // Filters
+            this.pnlFilters = new System.Windows.Forms.Panel();
+            this.lblStatusFilter = new System.Windows.Forms.Label();
+            this.cmbStatusFilter = new System.Windows.Forms.ComboBox();
+            this.lblEnvironment = new System.Windows.Forms.Label();
+            this.cmbEnvironment = new System.Windows.Forms.ComboBox();
+            this.lblQuickSearch = new System.Windows.Forms.Label();
+            this.txtQuickSearch = new System.Windows.Forms.TextBox();
+            this.btnApplyFilters = new System.Windows.Forms.Button();
+            this.btnClearFilters = new System.Windows.Forms.Button();
+
+            // Pipelines grid
+            this.gvPipelines = new System.Windows.Forms.DataGridView();
+            this.pipelinesBindingSource = new System.Windows.Forms.BindingSource(this.components);
+
+            // Pipelines columns
+            this.colPipelineName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colPipelineStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colReceived = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colProcessed = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colFailed = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colLastRun = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colDuration = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colOwner = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colTargetSystem = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
+            // Tab control with details
+            this.tabDetails = new System.Windows.Forms.TabControl();
+            this.tabSteps = new System.Windows.Forms.TabPage();
+            this.tabTimeline = new System.Windows.Forms.TabPage();
+            this.tabErrors = new System.Windows.Forms.TabPage();
+            this.tabMetrics = new System.Windows.Forms.TabPage();
+
+            // Steps tab controls
+            this.gvSteps = new System.Windows.Forms.DataGridView();
+            this.stepsBindingSource = new System.Windows.Forms.BindingSource(this.components);
+            this.colStepName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colStepStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colStepStart = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colStepEnd = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colStepDuration = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colStepError = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.btnRetryStep = new System.Windows.Forms.Button();
+            this.btnAcknowledge = new System.Windows.Forms.Button();
+
+            // Timeline
+            this.pnlTimeline = new System.Windows.Forms.Panel();
+            this.lblTimelineHint = new System.Windows.Forms.Label();
+            this.pbOverallProgress = new System.Windows.Forms.ProgressBar();
+
+            // Errors tab
+            this.gvErrors = new System.Windows.Forms.DataGridView();
+            this.errorsBindingSource = new System.Windows.Forms.BindingSource(this.components);
+            this.colErrorId = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colErrorPipeline = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colErrorStep = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colErrorMessage = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colErrorTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colErrorResolved = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.btnViewErrorDetails = new System.Windows.Forms.Button();
+
+            // Metrics tab
+            this.chartMetrics = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.pnlMetricsSummary = new System.Windows.Forms.Panel();
+            this.lblMetricTotalReceived = new System.Windows.Forms.Label();
+            this.lblMetricTotalProcessed = new System.Windows.Forms.Label();
+            this.lblMetricTotalFailed = new System.Windows.Forms.Label();
+
+            // Bottom status strip
+            this.statusStrip = new System.Windows.Forms.StatusStrip();
+            this.tsslStatus = new System.Windows.Forms.ToolStripStatusLabel();
+            this.tssProgress = new System.Windows.Forms.ToolStripProgressBar();
+
+            // Modal overlays
+            this.pnlModalOverlay = new System.Windows.Forms.Panel();
+            this.pnlProgressModal = new System.Windows.Forms.Panel();
+            this.lblProgressTitle = new System.Windows.Forms.Label();
+            this.pbModal = new System.Windows.Forms.ProgressBar();
+            this.btnModalCancel = new System.Windows.Forms.Button();
+            this.pnlErrorModal = new System.Windows.Forms.Panel();
+            this.txtModalErrorDetails = new System.Windows.Forms.TextBox();
+            this.btnCloseErrorModal = new System.Windows.Forms.Button();
+
+            // -----------------------------
+            // Header layout and controls
+            // -----------------------------
+            this.pnlHeader.SuspendLayout();
+            this.pnlHeader.Controls.Add(this.lblTitle);
+            this.pnlHeader.Controls.Add(this.lblDate);
+            this.pnlHeader.Controls.Add(this.dtpDate);
+            this.pnlHeader.Controls.Add(this.btnRefresh);
+            this.pnlHeader.Controls.Add(this.btnCloseDay);
+            this.pnlHeader.Controls.Add(this.btnExportCsv);
+            this.pnlHeader.Controls.Add(this.btnOpenLogs);
+            this.pnlHeader.Controls.Add(this.btnCreateIncident);
+
+            this.lblTitle.Text = "Integration Day Overview";
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
+            this.lblTitle.AutoSize = true;
+            this.lblTitle.Location = new System.Drawing.Point(14, 10);
+
+            this.lblDate.Text = "Date:";
+            this.lblDate.Location = new System.Drawing.Point(14, 44);
+            this.dtpDate.Location = new System.Drawing.Point(60, 40);
+            this.dtpDate.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+
+            // Buttons
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.Location = new System.Drawing.Point(220, 38);
+            this.btnRefresh.Width = 90;
+            this.btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.System;
+
+            this.btnCloseDay.Text = "Close Day";
+            this.btnCloseDay.Location = new System.Drawing.Point(320, 38);
+            this.btnCloseDay.Width = 100;
+            this.btnCloseDay.BackColor = System.Drawing.Color.FromArgb(0, 120, 215);
+            this.btnCloseDay.ForeColor = System.Drawing.Color.White;
+            this.btnCloseDay.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnExportCsv.Text = "Export CSV";
+            this.btnExportCsv.Location = new System.Drawing.Point(430, 38);
+            this.btnExportCsv.Width = 90;
+
+            this.btnOpenLogs.Text = "Open Logs";
+            this.btnOpenLogs.Location = new System.Drawing.Point(530, 38);
+            this.btnOpenLogs.Width = 90;
+
+            this.btnCreateIncident.Text = "Create Incident";
+            this.btnCreateIncident.Location = new System.Drawing.Point(630, 38);
+            this.btnCreateIncident.Width = 120;
+            this.btnCreateIncident.BackColor = System.Drawing.Color.FromArgb(220, 53, 69);
+            this.btnCreateIncident.ForeColor = System.Drawing.Color.White;
+            this.btnCreateIncident.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            // Header dock
+            this.pnlHeader.Dock = System.Windows.Forms.DockStyle.Top;
+            this.pnlHeader.Height = 80;
+            this.pnlHeader.BackColor = System.Drawing.Color.WhiteSmoke;
+
+            // -----------------------------
+            // Main split containers
+            // -----------------------------
+            this.mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.mainSplit.Orientation = System.Windows.Forms.Orientation.Vertical;
+            this.mainSplit.SplitterDistance = 260; // left width
+            this.mainSplit.Panel1MinSize = 220;
+            this.mainSplit.Panel2MinSize = 600;
+
+            // Left panel content
+            this.pnlLeft.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlLeft.Padding = new System.Windows.Forms.Padding(8);
+            this.pnlLeft.Controls.Add(this.lblPipelines);
+            this.pnlLeft.Controls.Add(this.txtPipelineSearch);
+            this.pnlLeft.Controls.Add(this.treePipelines);
+            this.pnlLeft.Controls.Add(this.btnExpandAll);
+            this.pnlLeft.Controls.Add(this.btnCollapseAll);
+
+            this.lblPipelines.Text = "Pipelines";
+            this.lblPipelines.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblPipelines.Location = new System.Drawing.Point(12, 8);
+
+            this.txtPipelineSearch.PlaceholderText = "Search pipelines...";
+            this.txtPipelineSearch.Location = new System.Drawing.Point(12, 36);
+            this.txtPipelineSearch.Width = 220;
+
+            this.treePipelines.Location = new System.Drawing.Point(12, 70);
+            this.treePipelines.Width = 230;
+            this.treePipelines.Height = 540;
+            this.treePipelines.HideSelection = false;
+            this.treePipelines.FullRowSelect = true;
+
+            this.btnExpandAll.Text = "Expand";
+            this.btnExpandAll.Location = new System.Drawing.Point(12, 620);
+            this.btnExpandAll.Width = 100;
+            this.btnCollapseAll.Text = "Collapse";
+            this.btnCollapseAll.Location = new System.Drawing.Point(130, 620);
+            this.btnCollapseAll.Width = 100;
+
+            // Place left controls into mainSplit.Panel1
+            this.mainSplit.Panel1.Controls.Add(this.pnlLeft);
+
+            // RightSplit: top = grid, bottom = details
+            this.rightSplit.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.rightSplit.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            this.rightSplit.SplitterDistance = 300;
+            this.rightSplit.Panel1.Controls.Add(this.pnlFilters);
+            this.rightSplit.Panel1.Controls.Add(this.gvPipelines);
+            this.rightSplit.Panel2.Controls.Add(this.tabDetails);
+
+            // Filters panel
+            this.pnlFilters.Dock = System.Windows.Forms.DockStyle.Top;
+            this.pnlFilters.Height = 44;
+            this.pnlFilters.Padding = new System.Windows.Forms.Padding(8);
+            this.pnlFilters.Controls.Add(this.lblStatusFilter);
+            this.pnlFilters.Controls.Add(this.cmbStatusFilter);
+            this.pnlFilters.Controls.Add(this.lblEnvironment);
+            this.pnlFilters.Controls.Add(this.cmbEnvironment);
+            this.pnlFilters.Controls.Add(this.lblQuickSearch);
+            this.pnlFilters.Controls.Add(this.txtQuickSearch);
+            this.pnlFilters.Controls.Add(this.btnApplyFilters);
+            this.pnlFilters.Controls.Add(this.btnClearFilters);
+
+            this.lblStatusFilter.Location = new System.Drawing.Point(8, 10);
+            this.lblStatusFilter.Text = "Status";
+            this.cmbStatusFilter.Location = new System.Drawing.Point(60, 8);
+            this.cmbStatusFilter.Width = 120;
+            this.cmbStatusFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbStatusFilter.Items.AddRange(new object[] { "ALL", "All Confirmed", "Partially Confirmed", "Minimal Confirmation", "No Confirmation" });
+            this.cmbStatusFilter.SelectedIndex = 0;
+
+            this.lblEnvironment.Location = new System.Drawing.Point(200, 10);
+            this.lblEnvironment.Text = "Environment";
+            this.cmbEnvironment.Location = new System.Drawing.Point(280, 8);
+            this.cmbEnvironment.Width = 120;
+            this.cmbEnvironment.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbEnvironment.Items.AddRange(new object[] { "ALL", "PROD", "QA", "DEV" });
+            this.cmbEnvironment.SelectedIndex = 0;
+
+            this.lblQuickSearch.Location = new System.Drawing.Point(420, 10);
+            this.lblQuickSearch.Text = "Search";
+            this.txtQuickSearch.Location = new System.Drawing.Point(470, 8);
+            this.txtQuickSearch.Width = 220;
+
+            this.btnApplyFilters.Text = "Apply";
+            this.btnApplyFilters.Location = new System.Drawing.Point(700, 6);
+            this.btnApplyFilters.Width = 80;
+            this.btnClearFilters.Text = "Clear";
+            this.btnClearFilters.Location = new System.Drawing.Point(790, 6);
+            this.btnClearFilters.Width = 80;
+
+            // -----------------------------
+            // Pipelines grid (top right)
+            // -----------------------------
+            this.gvPipelines.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.gvPipelines.AllowUserToAddRows = false;
+            this.gvPipelines.AllowUserToDeleteRows = false;
+            this.gvPipelines.ReadOnly = true;
+            this.gvPipelines.MultiSelect = true;
+            this.gvPipelines.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.gvPipelines.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.gvPipelines.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.gvPipelines.RowHeadersVisible = false;
+            this.gvPipelines.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+
+            // Add columns
+            this.colPipelineName.HeaderText = "Pipeline";
+            this.colPipelineName.Name = "Pipeline";
+            this.colPipelineName.DataPropertyName = "Pipeline";
+
+            this.colPipelineStatus.HeaderText = "Status";
+            this.colPipelineStatus.Name = "Status";
+            this.colPipelineStatus.DataPropertyName = "Status";
+
+            this.colReceived.HeaderText = "Received";
+            this.colReceived.Name = "Received";
+            this.colReceived.DataPropertyName = "Received";
+
+            this.colProcessed.HeaderText = "Processed";
+            this.colProcessed.Name = "Processed";
+            this.colProcessed.DataPropertyName = "Processed";
+
+            this.colFailed.HeaderText = "Failed";
+            this.colFailed.Name = "Failed";
+            this.colFailed.DataPropertyName = "Failed";
+
+            this.colLastRun.HeaderText = "Last Run";
+            this.colLastRun.Name = "LastRun";
+            this.colLastRun.DataPropertyName = "LastRun";
+
+            this.colDuration.HeaderText = "Duration";
+            this.colDuration.Name = "Duration";
+            this.colDuration.DataPropertyName = "Duration";
+
+            this.colOwner.HeaderText = "Owner";
+            this.colOwner.Name = "Owner";
+            this.colOwner.DataPropertyName = "Owner";
+
+            this.colTargetSystem.HeaderText = "Target System";
+            this.colTargetSystem.Name = "TargetSystem";
+            this.colTargetSystem.DataPropertyName = "TargetSystem";
+
+            // add columns to grid
+            this.gvPipelines.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+                this.colPipelineName,
+                this.colPipelineStatus,
+                this.colReceived,
+                this.colProcessed,
+                this.colFailed,
+                this.colLastRun,
+                this.colDuration,
+                this.colOwner,
+                this.colTargetSystem
+            });
+
+            // -----------------------------
+            // Tab details (bottom right)
+            // -----------------------------
+            this.tabDetails.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tabDetails.TabPages.AddRange(new System.Windows.Forms.TabPage[] {
+                this.tabSteps,
+                this.tabTimeline,
+                this.tabErrors,
+                this.tabMetrics
+            });
+
+            // Steps tab
+            this.tabSteps.Text = "Steps";
+            this.tabSteps.Padding = new System.Windows.Forms.Padding(8);
+
+            this.gvSteps.Dock = System.Windows.Forms.DockStyle.Top;
+            this.gvSteps.Height = 260;
+            this.gvSteps.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.gvSteps.ReadOnly = true;
+            this.gvSteps.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.gvSteps.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+                this.colStepName,
+                this.colStepStatus,
+                this.colStepStart,
+                this.colStepEnd,
+                this.colStepDuration,
+                this.colStepError
+            });
+
+            this.tabSteps.Controls.Add(this.gvSteps);
