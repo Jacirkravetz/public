@@ -1,9 +1,15 @@
-namespace IntegrationWorkflowApp
+namespace WorkflowApp
 {
     partial class WorkflowDashboard
     {
+        /// <summary>
+        ///  Required designer variable.
+        /// </summary>
         private System.ComponentModel.IContainer components = null;
 
+        /// <summary>
+        ///  Clean up resources.
+        /// </summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -17,196 +23,161 @@ namespace IntegrationWorkflowApp
 
         private void InitializeComponent()
         {
-            this.panelHeader = new System.Windows.Forms.Panel();
-            this.lblTitle = new System.Windows.Forms.Label();
-            this.lblCurrentDate = new System.Windows.Forms.Label();
-            this.btnRefresh = new System.Windows.Forms.Button();
-            this.btnExportPdf = new System.Windows.Forms.Button();
-            this.btnHistory = new System.Windows.Forms.Button();
+            this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(WorkflowDashboard));
 
-            this.panelLeft = new System.Windows.Forms.Panel();
-            this.lblDateRange = new System.Windows.Forms.Label();
-            this.dateFrom = new System.Windows.Forms.DateTimePicker();
-            this.dateTo = new System.Windows.Forms.DateTimePicker();
-            this.btnApplyFilter = new System.Windows.Forms.Button();
-            this.progressOverall = new System.Windows.Forms.ProgressBar();
-            this.lblProgress = new System.Windows.Forms.Label();
+            // ==== Form Settings ====
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.ClientSize = new System.Drawing.Size(1400, 900);
+            this.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.Text = "Workflow Dashboard";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 
-            this.panelCenter = new System.Windows.Forms.Panel();
-            this.lblSource = new System.Windows.Forms.Label();
-            this.lblProcessing = new System.Windows.Forms.Label();
-            this.lblDestination = new System.Windows.Forms.Label();
+            // ==== Top Panel ====
+            Panel panelTop = new Panel();
+            panelTop.Dock = DockStyle.Top;
+            panelTop.Height = 80;
+            panelTop.BackColor = System.Drawing.Color.FromArgb(30, 50, 80);
+            panelTop.Padding = new Padding(15, 10, 15, 10);
 
-            this.panelRight = new System.Windows.Forms.Panel();
-            this.lblSuccess = new System.Windows.Forms.Label();
-            this.lblFailed = new System.Windows.Forms.Label();
-            this.lblPending = new System.Windows.Forms.Label();
-            this.lblRunning = new System.Windows.Forms.Label();
+            Label lblTitle = new Label();
+            lblTitle.Text = "Workflow Dashboard";
+            lblTitle.ForeColor = Color.White;
+            lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblTitle.Dock = DockStyle.Left;
+            lblTitle.AutoSize = true;
 
-            this.panelBottom = new System.Windows.Forms.Panel();
-            this.txtLog = new System.Windows.Forms.TextBox();
+            Button btnRefresh = new Button();
+            btnRefresh.Text = "Refresh";
+            btnRefresh.BackColor = Color.FromArgb(0, 120, 215);
+            btnRefresh.ForeColor = Color.White;
+            btnRefresh.FlatStyle = FlatStyle.Flat;
+            btnRefresh.FlatAppearance.BorderSize = 0;
+            btnRefresh.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnRefresh.Size = new Size(100, 35);
+            btnRefresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnRefresh.Location = new Point(1270, 20);
 
-            this.SuspendLayout();
+            panelTop.Controls.Add(btnRefresh);
+            panelTop.Controls.Add(lblTitle);
 
-            // ===== HEADER =====
-            this.panelHeader.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panelHeader.Height = 60;
-            this.panelHeader.BackColor = System.Drawing.Color.FromArgb(45, 45, 48);
+            // ==== KPI Panel ====
+            FlowLayoutPanel panelKPI = new FlowLayoutPanel();
+            panelKPI.Dock = DockStyle.Top;
+            panelKPI.Height = 120;
+            panelKPI.Padding = new Padding(15, 10, 15, 10);
+            panelKPI.BackColor = Color.White;
+            panelKPI.FlowDirection = FlowDirection.LeftToRight;
 
-            this.lblTitle.Text = "Integration Workflow Dashboard";
-            this.lblTitle.ForeColor = System.Drawing.Color.White;
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.Location = new System.Drawing.Point(20, 15);
+            panelKPI.Controls.Add(CreateKpiCard("Success", "0", Color.FromArgb(0, 153, 51)));
+            panelKPI.Controls.Add(CreateKpiCard("Failed", "0", Color.FromArgb(204, 0, 0)));
+            panelKPI.Controls.Add(CreateKpiCard("Pending", "0", Color.FromArgb(255, 204, 0)));
+            panelKPI.Controls.Add(CreateKpiCard("Running", "0", Color.FromArgb(0, 102, 204)));
+            panelKPI.Controls.Add(CreateKpiCard("Error", "0", Color.DarkRed));
 
-            this.lblCurrentDate.Text = DateTime.Now.ToString("dddd, dd MMM yyyy");
-            this.lblCurrentDate.ForeColor = System.Drawing.Color.WhiteSmoke;
-            this.lblCurrentDate.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblCurrentDate.Location = new System.Drawing.Point(350, 20);
+            // ==== Filter Panel ====
+            Panel panelFilters = new Panel();
+            panelFilters.Dock = DockStyle.Top;
+            panelFilters.Height = 60;
+            panelFilters.Padding = new Padding(15, 10, 15, 10);
+            panelFilters.BackColor = Color.White;
 
-            this.btnRefresh.Text = "Refresh";
-            this.btnRefresh.Location = new System.Drawing.Point(650, 15);
+            Label lblFrom = new Label();
+            lblFrom.Text = "From:";
+            lblFrom.Location = new Point(10, 15);
+            DateTimePicker dpFrom = new DateTimePicker();
+            dpFrom.Location = new Point(60, 10);
+            dpFrom.Width = 150;
 
-            this.btnExportPdf.Text = "Export PDF";
-            this.btnExportPdf.Location = new System.Drawing.Point(740, 15);
+            Label lblTo = new Label();
+            lblTo.Text = "To:";
+            lblTo.Location = new Point(230, 15);
+            DateTimePicker dpTo = new DateTimePicker();
+            dpTo.Location = new Point(270, 10);
+            dpTo.Width = 150;
 
-            this.btnHistory.Text = "History";
-            this.btnHistory.Location = new System.Drawing.Point(850, 15);
+            Label lblStatus = new Label();
+            lblStatus.Text = "Status:";
+            lblStatus.Location = new Point(440, 15);
+            ComboBox cbStatus = new ComboBox();
+            cbStatus.Items.AddRange(new string[] { "All", "Success", "Failed", "Pending", "Running", "Error" });
+            cbStatus.DropDownStyle = ComboBoxStyle.DropDownList;
+            cbStatus.Location = new Point(500, 10);
+            cbStatus.Width = 150;
 
-            this.panelHeader.Controls.AddRange(new System.Windows.Forms.Control[]
-            {
-                this.lblTitle, this.lblCurrentDate, this.btnRefresh, this.btnExportPdf, this.btnHistory
-            });
+            Label lblSearch = new Label();
+            lblSearch.Text = "Search:";
+            lblSearch.Location = new Point(670, 15);
+            TextBox txtSearch = new TextBox();
+            txtSearch.Location = new Point(730, 10);
+            txtSearch.Width = 200;
 
-            // ===== LEFT PANEL =====
-            this.panelLeft.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panelLeft.Width = 200;
-            this.panelLeft.BackColor = System.Drawing.Color.WhiteSmoke;
+            Button btnExport = new Button();
+            btnExport.Text = "Export";
+            btnExport.BackColor = Color.FromArgb(40, 167, 69);
+            btnExport.ForeColor = Color.White;
+            btnExport.FlatStyle = FlatStyle.Flat;
+            btnExport.FlatAppearance.BorderSize = 0;
+            btnExport.Location = new Point(950, 10);
+            btnExport.Width = 100;
 
-            this.lblDateRange.Text = "Date Range:";
-            this.lblDateRange.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblDateRange.Location = new System.Drawing.Point(10, 20);
+            panelFilters.Controls.AddRange(new Control[] { lblFrom, dpFrom, lblTo, dpTo, lblStatus, cbStatus, lblSearch, txtSearch, btnExport });
 
-            this.dateFrom.Location = new System.Drawing.Point(10, 50);
-            this.dateTo.Location = new System.Drawing.Point(10, 80);
+            // ==== Data Grid ====
+            DataGridView dgvWorkflow = new DataGridView();
+            dgvWorkflow.Dock = DockStyle.Fill;
+            dgvWorkflow.BackgroundColor = Color.White;
+            dgvWorkflow.GridColor = Color.LightGray;
+            dgvWorkflow.AllowUserToAddRows = false;
+            dgvWorkflow.AllowUserToDeleteRows = false;
+            dgvWorkflow.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvWorkflow.ReadOnly = true;
+            dgvWorkflow.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            this.btnApplyFilter.Text = "Apply Filter";
-            this.btnApplyFilter.Location = new System.Drawing.Point(10, 110);
+            // Columns example
+            dgvWorkflow.Columns.Add("Date", "Date");
+            dgvWorkflow.Columns.Add("Source", "Source");
+            dgvWorkflow.Columns.Add("Destination", "Destination");
+            dgvWorkflow.Columns.Add("Status", "Status");
+            dgvWorkflow.Columns.Add("Duration", "Duration");
+            dgvWorkflow.Columns.Add("Details", "Details");
 
-            this.lblProgress.Text = "Overall Progress:";
-            this.lblProgress.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblProgress.Location = new System.Drawing.Point(10, 160);
+            // ==== Layout ====
+            this.Controls.Add(dgvWorkflow);
+            this.Controls.Add(panelFilters);
+            this.Controls.Add(panelKPI);
+            this.Controls.Add(panelTop);
+        }
 
-            this.progressOverall.Location = new System.Drawing.Point(10, 185);
-            this.progressOverall.Width = 170;
+        private Panel CreateKpiCard(string title, string value, Color color)
+        {
+            Panel card = new Panel();
+            card.Width = 200;
+            card.Height = 100;
+            card.BackColor = color;
+            card.Margin = new Padding(10);
+            card.Padding = new Padding(10);
 
-            this.panelLeft.Controls.AddRange(new System.Windows.Forms.Control[]
-            {
-                this.lblDateRange, this.dateFrom, this.dateTo, this.btnApplyFilter, this.lblProgress, this.progressOverall
-            });
+            Label lblTitle = new Label();
+            lblTitle.Text = title;
+            lblTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            lblTitle.ForeColor = Color.White;
+            lblTitle.Dock = DockStyle.Top;
 
-            // ===== CENTER PANEL =====
-            this.panelCenter.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelCenter.BackColor = System.Drawing.Color.White;
+            Label lblValue = new Label();
+            lblValue.Text = value;
+            lblValue.Font = new Font("Segoe UI", 22F, FontStyle.Bold);
+            lblValue.ForeColor = Color.White;
+            lblValue.Dock = DockStyle.Fill;
+            lblValue.TextAlign = ContentAlignment.MiddleCenter;
 
-            this.lblSource.Text = "Source System";
-            this.lblSource.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.lblSource.Location = new System.Drawing.Point(100, 100);
+            card.Controls.Add(lblValue);
+            card.Controls.Add(lblTitle);
 
-            this.lblProcessing.Text = "Processing";
-            this.lblProcessing.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.lblProcessing.Location = new System.Drawing.Point(300, 100);
-
-            this.lblDestination.Text = "Destination System";
-            this.lblDestination.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.lblDestination.Location = new System.Drawing.Point(500, 100);
-
-            this.panelCenter.Controls.AddRange(new System.Windows.Forms.Control[]
-            {
-                this.lblSource, this.lblProcessing, this.lblDestination
-            });
-
-            // ===== RIGHT PANEL =====
-            this.panelRight.Dock = System.Windows.Forms.DockStyle.Right;
-            this.panelRight.Width = 200;
-            this.panelRight.BackColor = System.Drawing.Color.WhiteSmoke;
-
-            this.lblSuccess.Text = "Success: 0";
-            this.lblSuccess.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblSuccess.ForeColor = System.Drawing.Color.Green;
-            this.lblSuccess.Location = new System.Drawing.Point(20, 20);
-
-            this.lblFailed.Text = "Failed: 0";
-            this.lblFailed.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblFailed.ForeColor = System.Drawing.Color.Red;
-            this.lblFailed.Location = new System.Drawing.Point(20, 50);
-
-            this.lblPending.Text = "Pending: 0";
-            this.lblPending.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblPending.ForeColor = System.Drawing.Color.DarkOrange;
-            this.lblPending.Location = new System.Drawing.Point(20, 80);
-
-            this.lblRunning.Text = "Running: 0";
-            this.lblRunning.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblRunning.ForeColor = System.Drawing.Color.Blue;
-            this.lblRunning.Location = new System.Drawing.Point(20, 110);
-
-            this.panelRight.Controls.AddRange(new System.Windows.Forms.Control[]
-            {
-                this.lblSuccess, this.lblFailed, this.lblPending, this.lblRunning
-            });
-
-            // ===== BOTTOM PANEL =====
-            this.panelBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.panelBottom.Height = 150;
-            this.panelBottom.BackColor = System.Drawing.Color.White;
-
-            this.txtLog.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtLog.Multiline = true;
-            this.txtLog.ReadOnly = true;
-            this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-
-            this.panelBottom.Controls.Add(this.txtLog);
-
-            // ===== FORM =====
-            this.ClientSize = new System.Drawing.Size(1080, 720);
-            this.Controls.Add(this.panelCenter);
-            this.Controls.Add(this.panelRight);
-            this.Controls.Add(this.panelLeft);
-            this.Controls.Add(this.panelBottom);
-            this.Controls.Add(this.panelHeader);
-            this.Text = "Integration Workflow Dashboard";
-            this.ResumeLayout(false);
+            return card;
         }
 
         #endregion
-
-        private System.Windows.Forms.Panel panelHeader;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.Label lblCurrentDate;
-        private System.Windows.Forms.Button btnRefresh;
-        private System.Windows.Forms.Button btnExportPdf;
-        private System.Windows.Forms.Button btnHistory;
-
-        private System.Windows.Forms.Panel panelLeft;
-        private System.Windows.Forms.Label lblDateRange;
-        private System.Windows.Forms.DateTimePicker dateFrom;
-        private System.Windows.Forms.DateTimePicker dateTo;
-        private System.Windows.Forms.Button btnApplyFilter;
-        private System.Windows.Forms.ProgressBar progressOverall;
-        private System.Windows.Forms.Label lblProgress;
-
-        private System.Windows.Forms.Panel panelCenter;
-        private System.Windows.Forms.Label lblSource;
-        private System.Windows.Forms.Label lblProcessing;
-        private System.Windows.Forms.Label lblDestination;
-
-        private System.Windows.Forms.Panel panelRight;
-        private System.Windows.Forms.Label lblSuccess;
-        private System.Windows.Forms.Label lblFailed;
-        private System.Windows.Forms.Label lblPending;
-        private System.Windows.Forms.Label lblRunning;
-
-        private System.Windows.Forms.Panel panelBottom;
-        private System.Windows.Forms.TextBox txtLog;
     }
 }
