@@ -1,4 +1,4 @@
-namespace GlobalIntegrationMonitor
+namespace IntegrationWorkflowApp
 {
     partial class WorkflowDashboard
     {
@@ -17,156 +17,196 @@ namespace GlobalIntegrationMonitor
 
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
+            this.panelHeader = new System.Windows.Forms.Panel();
+            this.lblTitle = new System.Windows.Forms.Label();
+            this.lblCurrentDate = new System.Windows.Forms.Label();
+            this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnExportPdf = new System.Windows.Forms.Button();
+            this.btnHistory = new System.Windows.Forms.Button();
 
-            // ======== FORM CONFIG =========
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.Text = "Workflow Dashboard - Global Financial Integrations";
-            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
-            this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panelLeft = new System.Windows.Forms.Panel();
+            this.lblDateRange = new System.Windows.Forms.Label();
+            this.dateFrom = new System.Windows.Forms.DateTimePicker();
+            this.dateTo = new System.Windows.Forms.DateTimePicker();
+            this.btnApplyFilter = new System.Windows.Forms.Button();
+            this.progressOverall = new System.Windows.Forms.ProgressBar();
+            this.lblProgress = new System.Windows.Forms.Label();
 
-            // ======== MAIN CONTAINER ========
-            var mainSplit = new System.Windows.Forms.SplitContainer();
-            mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
-            mainSplit.Orientation = System.Windows.Forms.Orientation.Horizontal;
-            mainSplit.SplitterDistance = 140;
-            this.Controls.Add(mainSplit);
+            this.panelCenter = new System.Windows.Forms.Panel();
+            this.lblSource = new System.Windows.Forms.Label();
+            this.lblProcessing = new System.Windows.Forms.Label();
+            this.lblDestination = new System.Windows.Forms.Label();
 
-            // ======== HEADER PANEL ========
-            var pnlHeader = new System.Windows.Forms.Panel();
-            pnlHeader.Dock = System.Windows.Forms.DockStyle.Fill;
-            pnlHeader.BackColor = System.Drawing.Color.FromArgb(30, 60, 90);
-            pnlHeader.Padding = new System.Windows.Forms.Padding(10);
-            mainSplit.Panel1.Controls.Add(pnlHeader);
+            this.panelRight = new System.Windows.Forms.Panel();
+            this.lblSuccess = new System.Windows.Forms.Label();
+            this.lblFailed = new System.Windows.Forms.Label();
+            this.lblPending = new System.Windows.Forms.Label();
+            this.lblRunning = new System.Windows.Forms.Label();
 
-            var lblTitle = new System.Windows.Forms.Label();
-            lblTitle.Text = "Visão Geral do Workflow Diário - Pipelines e Integrações";
-            lblTitle.ForeColor = System.Drawing.Color.White;
-            lblTitle.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
-            lblTitle.Dock = System.Windows.Forms.DockStyle.Left;
-            lblTitle.Width = 700;
-            pnlHeader.Controls.Add(lblTitle);
+            this.panelBottom = new System.Windows.Forms.Panel();
+            this.txtLog = new System.Windows.Forms.TextBox();
 
-            var lblLastUpdate = new System.Windows.Forms.Label();
-            lblLastUpdate.Text = "Última atualização: --/--/---- --:--:--";
-            lblLastUpdate.ForeColor = System.Drawing.Color.WhiteSmoke;
-            lblLastUpdate.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Italic);
-            lblLastUpdate.Dock = System.Windows.Forms.DockStyle.Right;
-            lblLastUpdate.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            pnlHeader.Controls.Add(lblLastUpdate);
+            this.SuspendLayout();
 
-            // ======== TOOLBAR PANEL ========
-            var pnlToolbar = new System.Windows.Forms.Panel();
-            pnlToolbar.Dock = System.Windows.Forms.DockStyle.Top;
-            pnlToolbar.Height = 50;
-            pnlToolbar.Padding = new System.Windows.Forms.Padding(5);
-            pnlToolbar.BackColor = System.Drawing.Color.White;
-            mainSplit.Panel2.Controls.Add(pnlToolbar);
+            // ===== HEADER =====
+            this.panelHeader.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panelHeader.Height = 60;
+            this.panelHeader.BackColor = System.Drawing.Color.FromArgb(45, 45, 48);
 
-            var btnRefresh = new System.Windows.Forms.Button();
-            btnRefresh.Text = "Atualizar";
-            btnRefresh.Width = 100;
-            btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnRefresh.BackColor = System.Drawing.Color.FromArgb(0, 120, 215);
-            btnRefresh.ForeColor = System.Drawing.Color.White;
-            pnlToolbar.Controls.Add(btnRefresh);
+            this.lblTitle.Text = "Integration Workflow Dashboard";
+            this.lblTitle.ForeColor = System.Drawing.Color.White;
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
+            this.lblTitle.Location = new System.Drawing.Point(20, 15);
 
-            var btnExport = new System.Windows.Forms.Button();
-            btnExport.Text = "Exportar Excel";
-            btnExport.Width = 120;
-            btnExport.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnExport.BackColor = System.Drawing.Color.FromArgb(0, 150, 100);
-            btnExport.ForeColor = System.Drawing.Color.White;
-            pnlToolbar.Controls.Add(btnExport);
+            this.lblCurrentDate.Text = DateTime.Now.ToString("dddd, dd MMM yyyy");
+            this.lblCurrentDate.ForeColor = System.Drawing.Color.WhiteSmoke;
+            this.lblCurrentDate.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblCurrentDate.Location = new System.Drawing.Point(350, 20);
 
-            var btnExportPdf = new System.Windows.Forms.Button();
-            btnExportPdf.Text = "Exportar PDF";
-            btnExportPdf.Width = 120;
-            btnExportPdf.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnExportPdf.BackColor = System.Drawing.Color.FromArgb(200, 80, 0);
-            btnExportPdf.ForeColor = System.Drawing.Color.White;
-            pnlToolbar.Controls.Add(btnExportPdf);
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.Location = new System.Drawing.Point(650, 15);
 
-            var btnReprocess = new System.Windows.Forms.Button();
-            btnReprocess.Text = "Reprocessar Selecionados";
-            btnReprocess.Width = 180;
-            btnReprocess.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnReprocess.BackColor = System.Drawing.Color.FromArgb(255, 140, 0);
-            btnReprocess.ForeColor = System.Drawing.Color.White;
-            pnlToolbar.Controls.Add(btnReprocess);
+            this.btnExportPdf.Text = "Export PDF";
+            this.btnExportPdf.Location = new System.Drawing.Point(740, 15);
 
-            var dtpFilterDate = new System.Windows.Forms.DateTimePicker();
-            dtpFilterDate.Format = System.Windows.Forms.DateTimePickerFormat.Short;
-            pnlToolbar.Controls.Add(dtpFilterDate);
+            this.btnHistory.Text = "History";
+            this.btnHistory.Location = new System.Drawing.Point(850, 15);
 
-            var cboStatusFilter = new System.Windows.Forms.ComboBox();
-            cboStatusFilter.Items.AddRange(new string[] { "Todos", "Sucesso", "Falha", "Pendente", "Em Execução" });
-            cboStatusFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            pnlToolbar.Controls.Add(cboStatusFilter);
+            this.panelHeader.Controls.AddRange(new System.Windows.Forms.Control[]
+            {
+                this.lblTitle, this.lblCurrentDate, this.btnRefresh, this.btnExportPdf, this.btnHistory
+            });
 
-            var txtSearch = new System.Windows.Forms.TextBox();
-            txtSearch.PlaceholderText = "Pesquisar...";
-            txtSearch.Width = 200;
-            pnlToolbar.Controls.Add(txtSearch);
+            // ===== LEFT PANEL =====
+            this.panelLeft.Dock = System.Windows.Forms.DockStyle.Left;
+            this.panelLeft.Width = 200;
+            this.panelLeft.BackColor = System.Drawing.Color.WhiteSmoke;
 
-            // ======== CONTENT SPLIT ========
-            var contentSplit = new System.Windows.Forms.SplitContainer();
-            contentSplit.Dock = System.Windows.Forms.DockStyle.Fill;
-            contentSplit.Orientation = System.Windows.Forms.Orientation.Vertical;
-            mainSplit.Panel2.Controls.Add(contentSplit);
+            this.lblDateRange.Text = "Date Range:";
+            this.lblDateRange.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblDateRange.Location = new System.Drawing.Point(10, 20);
 
-            // ======== LEFT PANEL: WORKFLOW VIEW ========
-            var pnlWorkflow = new System.Windows.Forms.Panel();
-            pnlWorkflow.Dock = System.Windows.Forms.DockStyle.Fill;
-            pnlWorkflow.Padding = new System.Windows.Forms.Padding(10);
-            pnlWorkflow.BackColor = System.Drawing.Color.White;
-            contentSplit.Panel1.Controls.Add(pnlWorkflow);
+            this.dateFrom.Location = new System.Drawing.Point(10, 50);
+            this.dateTo.Location = new System.Drawing.Point(10, 80);
 
-            var lblWorkflow = new System.Windows.Forms.Label();
-            lblWorkflow.Text = "Workflow do Dia";
-            lblWorkflow.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            lblWorkflow.Dock = System.Windows.Forms.DockStyle.Top;
-            pnlWorkflow.Controls.Add(lblWorkflow);
+            this.btnApplyFilter.Text = "Apply Filter";
+            this.btnApplyFilter.Location = new System.Drawing.Point(10, 110);
 
-            var dgvWorkflow = new System.Windows.Forms.DataGridView();
-            dgvWorkflow.Dock = System.Windows.Forms.DockStyle.Fill;
-            dgvWorkflow.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            dgvWorkflow.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            dgvWorkflow.MultiSelect = true;
-            pnlWorkflow.Controls.Add(dgvWorkflow);
+            this.lblProgress.Text = "Overall Progress:";
+            this.lblProgress.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblProgress.Location = new System.Drawing.Point(10, 160);
 
-            // ======== RIGHT PANEL: INDICATORS + LOGS ========
-            var pnlRight = new System.Windows.Forms.Panel();
-            pnlRight.Dock = System.Windows.Forms.DockStyle.Fill;
-            pnlRight.Padding = new System.Windows.Forms.Padding(10);
-            pnlRight.BackColor = System.Drawing.Color.WhiteSmoke;
-            contentSplit.Panel2.Controls.Add(pnlRight);
+            this.progressOverall.Location = new System.Drawing.Point(10, 185);
+            this.progressOverall.Width = 170;
 
-            var lblIndicators = new System.Windows.Forms.Label();
-            lblIndicators.Text = "Indicadores do Dia";
-            lblIndicators.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            lblIndicators.Dock = System.Windows.Forms.DockStyle.Top;
-            pnlRight.Controls.Add(lblIndicators);
+            this.panelLeft.Controls.AddRange(new System.Windows.Forms.Control[]
+            {
+                this.lblDateRange, this.dateFrom, this.dateTo, this.btnApplyFilter, this.lblProgress, this.progressOverall
+            });
 
-            var chartProgress = new System.Windows.Forms.DataVisualization.Charting.Chart();
-            chartProgress.Dock = System.Windows.Forms.DockStyle.Top;
-            chartProgress.Height = 200;
-            pnlRight.Controls.Add(chartProgress);
+            // ===== CENTER PANEL =====
+            this.panelCenter.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panelCenter.BackColor = System.Drawing.Color.White;
 
-            var lblLogs = new System.Windows.Forms.Label();
-            lblLogs.Text = "Log Detalhado";
-            lblLogs.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            lblLogs.Dock = System.Windows.Forms.DockStyle.Top;
-            pnlRight.Controls.Add(lblLogs);
+            this.lblSource.Text = "Source System";
+            this.lblSource.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this.lblSource.Location = new System.Drawing.Point(100, 100);
 
-            var txtLogs = new System.Windows.Forms.TextBox();
-            txtLogs.Multiline = true;
-            txtLogs.Dock = System.Windows.Forms.DockStyle.Fill;
-            txtLogs.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            pnlRight.Controls.Add(txtLogs);
+            this.lblProcessing.Text = "Processing";
+            this.lblProcessing.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this.lblProcessing.Location = new System.Drawing.Point(300, 100);
+
+            this.lblDestination.Text = "Destination System";
+            this.lblDestination.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this.lblDestination.Location = new System.Drawing.Point(500, 100);
+
+            this.panelCenter.Controls.AddRange(new System.Windows.Forms.Control[]
+            {
+                this.lblSource, this.lblProcessing, this.lblDestination
+            });
+
+            // ===== RIGHT PANEL =====
+            this.panelRight.Dock = System.Windows.Forms.DockStyle.Right;
+            this.panelRight.Width = 200;
+            this.panelRight.BackColor = System.Drawing.Color.WhiteSmoke;
+
+            this.lblSuccess.Text = "Success: 0";
+            this.lblSuccess.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblSuccess.ForeColor = System.Drawing.Color.Green;
+            this.lblSuccess.Location = new System.Drawing.Point(20, 20);
+
+            this.lblFailed.Text = "Failed: 0";
+            this.lblFailed.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblFailed.ForeColor = System.Drawing.Color.Red;
+            this.lblFailed.Location = new System.Drawing.Point(20, 50);
+
+            this.lblPending.Text = "Pending: 0";
+            this.lblPending.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblPending.ForeColor = System.Drawing.Color.DarkOrange;
+            this.lblPending.Location = new System.Drawing.Point(20, 80);
+
+            this.lblRunning.Text = "Running: 0";
+            this.lblRunning.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblRunning.ForeColor = System.Drawing.Color.Blue;
+            this.lblRunning.Location = new System.Drawing.Point(20, 110);
+
+            this.panelRight.Controls.AddRange(new System.Windows.Forms.Control[]
+            {
+                this.lblSuccess, this.lblFailed, this.lblPending, this.lblRunning
+            });
+
+            // ===== BOTTOM PANEL =====
+            this.panelBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.panelBottom.Height = 150;
+            this.panelBottom.BackColor = System.Drawing.Color.White;
+
+            this.txtLog.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtLog.Multiline = true;
+            this.txtLog.ReadOnly = true;
+            this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+
+            this.panelBottom.Controls.Add(this.txtLog);
+
+            // ===== FORM =====
+            this.ClientSize = new System.Drawing.Size(1080, 720);
+            this.Controls.Add(this.panelCenter);
+            this.Controls.Add(this.panelRight);
+            this.Controls.Add(this.panelLeft);
+            this.Controls.Add(this.panelBottom);
+            this.Controls.Add(this.panelHeader);
+            this.Text = "Integration Workflow Dashboard";
+            this.ResumeLayout(false);
         }
 
         #endregion
+
+        private System.Windows.Forms.Panel panelHeader;
+        private System.Windows.Forms.Label lblTitle;
+        private System.Windows.Forms.Label lblCurrentDate;
+        private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnExportPdf;
+        private System.Windows.Forms.Button btnHistory;
+
+        private System.Windows.Forms.Panel panelLeft;
+        private System.Windows.Forms.Label lblDateRange;
+        private System.Windows.Forms.DateTimePicker dateFrom;
+        private System.Windows.Forms.DateTimePicker dateTo;
+        private System.Windows.Forms.Button btnApplyFilter;
+        private System.Windows.Forms.ProgressBar progressOverall;
+        private System.Windows.Forms.Label lblProgress;
+
+        private System.Windows.Forms.Panel panelCenter;
+        private System.Windows.Forms.Label lblSource;
+        private System.Windows.Forms.Label lblProcessing;
+        private System.Windows.Forms.Label lblDestination;
+
+        private System.Windows.Forms.Panel panelRight;
+        private System.Windows.Forms.Label lblSuccess;
+        private System.Windows.Forms.Label lblFailed;
+        private System.Windows.Forms.Label lblPending;
+        private System.Windows.Forms.Label lblRunning;
+
+        private System.Windows.Forms.Panel panelBottom;
+        private System.Windows.Forms.TextBox txtLog;
     }
 }
