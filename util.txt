@@ -1,35 +1,361 @@
-public DataIntegrationDashboardForm()
+// DataIntegrationDashboardForm.Designer.cs
+namespace IntegrationDashboard
 {
-    InitializeComponent();
-    this.Load += DataIntegrationDashboardForm_Load;
-}
-
-private void DataIntegrationDashboardForm_Load(object? sender, EventArgs e)
-{
-    // valores desejados mínimos
-    int panel1Min = 220;
-    int panel2MinDesired = 600;
-
-    // largura disponível do cliente
-    int totalWidth = this.ClientSize.Width;
-
-    // garante que panel2Min não seja maior que o que cabe
-    int panel2Min = panel2MinDesired;
-    if (totalWidth < panel1Min + panel2MinDesired + 10) // +10 margem
+    partial class DataIntegrationDashboardForm
     {
-        // reduz conservadoramente o panel2Min para caber
-        panel2Min = Math.Max(200, totalWidth - panel1Min - 10);
+        private System.ComponentModel.IContainer components = null;
+
+        private System.Windows.Forms.Panel headerPanel;
+        private System.Windows.Forms.Label lblTitle;
+        private System.Windows.Forms.DateTimePicker dtpDate;
+        private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnCloseDay;
+        private System.Windows.Forms.Button btnExport;
+        private System.Windows.Forms.SplitContainer mainSplit;
+        private System.Windows.Forms.Panel leftPanel;
+        private System.Windows.Forms.Label lblPipelines;
+        private System.Windows.Forms.TextBox txtPipelineSearch;
+        private System.Windows.Forms.TreeView treePipelines;
+        private System.Windows.Forms.Button btnExpandAll;
+        private System.Windows.Forms.Button btnCollapseAll;
+
+        private System.Windows.Forms.Panel rightTopPanel;
+        private System.Windows.Forms.Panel filtersPanel;
+        private System.Windows.Forms.Label lblStatusFilter;
+        private System.Windows.Forms.ComboBox cmbStatusFilter;
+        private System.Windows.Forms.Label lblEnv;
+        private System.Windows.Forms.ComboBox cmbEnv;
+        private System.Windows.Forms.Label lblQuickSearch;
+        private System.Windows.Forms.TextBox txtQuickSearch;
+        private System.Windows.Forms.Button btnApplyFilters;
+        private System.Windows.Forms.Button btnClearFilters;
+
+        private System.Windows.Forms.DataGridView gvPipelines;
+        private System.Windows.Forms.BindingSource pipelinesBinding;
+
+        private System.Windows.Forms.TabControl tabDetails;
+        private System.Windows.Forms.TabPage tabSteps;
+        private System.Windows.Forms.TabPage tabTimeline;
+        private System.Windows.Forms.TabPage tabErrors;
+        private System.Windows.Forms.TabPage tabMetrics;
+
+        private System.Windows.Forms.DataGridView gvSteps;
+        private System.Windows.Forms.BindingSource stepsBinding;
+        private System.Windows.Forms.Button btnRetryStep;
+        private System.Windows.Forms.Button btnAcknowledge;
+
+        private System.Windows.Forms.DataGridView gvErrors;
+        private System.Windows.Forms.BindingSource errorsBinding;
+        private System.Windows.Forms.Button btnViewError;
+
+        private System.Windows.Forms.StatusStrip statusStrip;
+        private System.Windows.Forms.ToolStripStatusLabel tsslMain;
+        private System.Windows.Forms.ToolStripProgressBar tspbMain;
+
+        private System.Windows.Forms.Panel modalOverlay;
+        private System.Windows.Forms.Panel modalProgress;
+        private System.Windows.Forms.Label lblModalTitle;
+        private System.Windows.Forms.ProgressBar modalProgressBar;
+        private System.Windows.Forms.Button btnModalCancel;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+
+            // header
+            this.headerPanel = new System.Windows.Forms.Panel();
+            this.lblTitle = new System.Windows.Forms.Label();
+            this.dtpDate = new System.Windows.Forms.DateTimePicker();
+            this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnCloseDay = new System.Windows.Forms.Button();
+            this.btnExport = new System.Windows.Forms.Button();
+
+            // main split
+            this.mainSplit = new System.Windows.Forms.SplitContainer();
+            this.leftPanel = new System.Windows.Forms.Panel();
+            this.lblPipelines = new System.Windows.Forms.Label();
+            this.txtPipelineSearch = new System.Windows.Forms.TextBox();
+            this.treePipelines = new System.Windows.Forms.TreeView();
+            this.btnExpandAll = new System.Windows.Forms.Button();
+            this.btnCollapseAll = new System.Windows.Forms.Button();
+
+            // right area (top filters + grid + tabs)
+            this.rightTopPanel = new System.Windows.Forms.Panel();
+            this.filtersPanel = new System.Windows.Forms.Panel();
+            this.lblStatusFilter = new System.Windows.Forms.Label();
+            this.cmbStatusFilter = new System.Windows.Forms.ComboBox();
+            this.lblEnv = new System.Windows.Forms.Label();
+            this.cmbEnv = new System.Windows.Forms.ComboBox();
+            this.lblQuickSearch = new System.Windows.Forms.Label();
+            this.txtQuickSearch = new System.Windows.Forms.TextBox();
+            this.btnApplyFilters = new System.Windows.Forms.Button();
+            this.btnClearFilters = new System.Windows.Forms.Button();
+
+            this.gvPipelines = new System.Windows.Forms.DataGridView();
+            this.pipelinesBinding = new System.Windows.Forms.BindingSource(this.components);
+
+            this.tabDetails = new System.Windows.Forms.TabControl();
+            this.tabSteps = new System.Windows.Forms.TabPage();
+            this.tabTimeline = new System.Windows.Forms.TabPage();
+            this.tabErrors = new System.Windows.Forms.TabPage();
+            this.tabMetrics = new System.Windows.Forms.TabPage();
+
+            this.gvSteps = new System.Windows.Forms.DataGridView();
+            this.stepsBinding = new System.Windows.Forms.BindingSource(this.components);
+            this.btnRetryStep = new System.Windows.Forms.Button();
+            this.btnAcknowledge = new System.Windows.Forms.Button();
+
+            this.gvErrors = new System.Windows.Forms.DataGridView();
+            this.errorsBinding = new System.Windows.Forms.BindingSource(this.components);
+            this.btnViewError = new System.Windows.Forms.Button();
+
+            this.statusStrip = new System.Windows.Forms.StatusStrip();
+            this.tsslMain = new System.Windows.Forms.ToolStripStatusLabel();
+            this.tspbMain = new System.Windows.Forms.ToolStripProgressBar();
+
+            // modal overlay
+            this.modalOverlay = new System.Windows.Forms.Panel();
+            this.modalProgress = new System.Windows.Forms.Panel();
+            this.lblModalTitle = new System.Windows.Forms.Label();
+            this.modalProgressBar = new System.Windows.Forms.ProgressBar();
+            this.btnModalCancel = new System.Windows.Forms.Button();
+
+            // headerPanel
+            this.headerPanel.Dock = System.Windows.Forms.DockStyle.Top;
+            this.headerPanel.Height = 84;
+            this.headerPanel.Padding = new System.Windows.Forms.Padding(12);
+            this.headerPanel.BackColor = System.Drawing.Color.FromArgb(250, 250, 250);
+            this.headerPanel.Controls.Add(this.lblTitle);
+            this.headerPanel.Controls.Add(this.dtpDate);
+            this.headerPanel.Controls.Add(this.btnRefresh);
+            this.headerPanel.Controls.Add(this.btnCloseDay);
+            this.headerPanel.Controls.Add(this.btnExport);
+
+            // lblTitle
+            this.lblTitle.Text = "Integration Pipelines - Daily Overview";
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
+            this.lblTitle.AutoSize = true;
+            this.lblTitle.Location = new System.Drawing.Point(8, 10);
+
+            // dtpDate
+            this.dtpDate.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dtpDate.Location = new System.Drawing.Point(12, 44);
+
+            // btnRefresh
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.Location = new System.Drawing.Point(200, 42);
+            this.btnRefresh.Width = 90;
+
+            // btnCloseDay
+            this.btnCloseDay.Text = "Close Day";
+            this.btnCloseDay.Location = new System.Drawing.Point(300, 42);
+            this.btnCloseDay.BackColor = System.Drawing.Color.FromArgb(0, 120, 215);
+            this.btnCloseDay.ForeColor = System.Drawing.Color.White;
+            this.btnCloseDay.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCloseDay.Width = 110;
+
+            // btnExport
+            this.btnExport.Text = "Export";
+            this.btnExport.Location = new System.Drawing.Point(420, 42);
+            this.btnExport.Width = 90;
+
+            // mainSplit
+            this.mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.mainSplit.SplitterWidth = 6;
+            this.mainSplit.IsSplitterFixed = false;
+            this.mainSplit.Panel1MinSize = 220;
+            this.mainSplit.Panel2MinSize = 420;
+            this.mainSplit.Location = new System.Drawing.Point(0, 84);
+            this.mainSplit.Name = "mainSplit";
+
+            // leftPanel (Panel1)
+            this.leftPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.leftPanel.Padding = new System.Windows.Forms.Padding(8);
+            this.leftPanel.Controls.Add(this.lblPipelines);
+            this.leftPanel.Controls.Add(this.txtPipelineSearch);
+            this.leftPanel.Controls.Add(this.treePipelines);
+            this.leftPanel.Controls.Add(this.btnExpandAll);
+            this.leftPanel.Controls.Add(this.btnCollapseAll);
+
+            this.lblPipelines.Text = "Pipelines";
+            this.lblPipelines.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblPipelines.Location = new System.Drawing.Point(12, 8);
+
+            this.txtPipelineSearch.PlaceholderText = "Search...";
+            this.txtPipelineSearch.Location = new System.Drawing.Point(12, 36);
+            this.txtPipelineSearch.Width = 200;
+
+            this.treePipelines.Location = new System.Drawing.Point(12, 72);
+            this.treePipelines.Width = 220;
+            this.treePipelines.Height = 540;
+            this.treePipelines.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+                                                                             | System.Windows.Forms.AnchorStyles.Left)));
+
+            this.btnExpandAll.Text = "Expand";
+            this.btnExpandAll.Location = new System.Drawing.Point(12, 620);
+            this.btnExpandAll.Width = 100;
+
+            this.btnCollapseAll.Text = "Collapse";
+            this.btnCollapseAll.Location = new System.Drawing.Point(130, 620);
+            this.btnCollapseAll.Width = 100;
+
+            // rightTopPanel (Panel2)
+            this.rightTopPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+
+            // filtersPanel
+            this.filtersPanel.Dock = System.Windows.Forms.DockStyle.Top;
+            this.filtersPanel.Height = 44;
+            this.filtersPanel.Padding = new System.Windows.Forms.Padding(8);
+            this.filtersPanel.Controls.Add(this.lblStatusFilter);
+            this.filtersPanel.Controls.Add(this.cmbStatusFilter);
+            this.filtersPanel.Controls.Add(this.lblEnv);
+            this.filtersPanel.Controls.Add(this.cmbEnv);
+            this.filtersPanel.Controls.Add(this.lblQuickSearch);
+            this.filtersPanel.Controls.Add(this.txtQuickSearch);
+            this.filtersPanel.Controls.Add(this.btnApplyFilters);
+            this.filtersPanel.Controls.Add(this.btnClearFilters);
+
+            this.lblStatusFilter.Text = "Status:";
+            this.lblStatusFilter.Location = new System.Drawing.Point(8, 12);
+            this.cmbStatusFilter.Location = new System.Drawing.Point(60, 8);
+            this.cmbStatusFilter.Width = 160;
+            this.cmbStatusFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbStatusFilter.Items.AddRange(new object[] { "ALL", "All Confirmed", "Partially Confirmed", "Minimal Confirmation", "No Confirmation" });
+            this.cmbStatusFilter.SelectedIndex = 0;
+
+            this.lblEnv.Text = "Env:";
+            this.lblEnv.Location = new System.Drawing.Point(240, 12);
+            this.cmbEnv.Location = new System.Drawing.Point(275, 8);
+            this.cmbEnv.Width = 120;
+            this.cmbEnv.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbEnv.Items.AddRange(new object[] { "ALL", "PROD", "QA", "DEV" });
+            this.cmbEnv.SelectedIndex = 0;
+
+            this.lblQuickSearch.Text = "Search:";
+            this.lblQuickSearch.Location = new System.Drawing.Point(410, 12);
+            this.txtQuickSearch.Location = new System.Drawing.Point(460, 8);
+            this.txtQuickSearch.Width = 220;
+
+            this.btnApplyFilters.Text = "Apply";
+            this.btnApplyFilters.Location = new System.Drawing.Point(700, 8);
+            this.btnApplyFilters.Width = 80;
+            this.btnClearFilters.Text = "Clear";
+            this.btnClearFilters.Location = new System.Drawing.Point(790, 8);
+            this.btnClearFilters.Width = 80;
+
+            // gvPipelines
+            this.gvPipelines.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.gvPipelines.ReadOnly = true;
+            this.gvPipelines.AllowUserToAddRows = false;
+            this.gvPipelines.AllowUserToDeleteRows = false;
+            this.gvPipelines.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.gvPipelines.MultiSelect = true;
+            this.gvPipelines.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.gvPipelines.RowHeadersVisible = false;
+            this.gvPipelines.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+
+            // Tabs
+            this.tabDetails.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.tabDetails.Height = 320;
+            this.tabDetails.Controls.Add(this.tabSteps);
+            this.tabDetails.Controls.Add(this.tabTimeline);
+            this.tabDetails.Controls.Add(this.tabErrors);
+            this.tabDetails.Controls.Add(this.tabMetrics);
+
+            // Steps tab
+            this.tabSteps.Text = "Steps";
+            this.tabSteps.Padding = new System.Windows.Forms.Padding(8);
+            this.gvSteps.Dock = System.Windows.Forms.DockStyle.Top;
+            this.gvSteps.Height = 220;
+            this.gvSteps.ReadOnly = true;
+            this.gvSteps.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.tabSteps.Controls.Add(this.gvSteps);
+            this.btnRetryStep.Text = "Retry Step";
+            this.btnRetryStep.Location = new System.Drawing.Point(12, 232);
+            this.tabSteps.Controls.Add(this.btnRetryStep);
+            this.btnAcknowledge.Text = "Acknowledge";
+            this.btnAcknowledge.Location = new System.Drawing.Point(120, 232);
+            this.tabSteps.Controls.Add(this.btnAcknowledge);
+
+            // Errors tab
+            this.tabErrors.Text = "Errors";
+            this.tabErrors.Padding = new System.Windows.Forms.Padding(8);
+            this.gvErrors.Dock = System.Windows.Forms.DockStyle.Top;
+            this.gvErrors.Height = 240;
+            this.gvErrors.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.tabErrors.Controls.Add(this.gvErrors);
+            this.btnViewError.Text = "View Error Details";
+            this.btnViewError.Location = new System.Drawing.Point(12, 252);
+            this.tabErrors.Controls.Add(this.btnViewError);
+
+            // Metrics tab - left blank (chart can be added)
+            this.tabMetrics.Text = "Metrics";
+            this.tabMetrics.Padding = new System.Windows.Forms.Padding(8);
+
+            // status strip
+            this.statusStrip.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { this.tsslMain, this.tspbMain });
+            this.tsslMain.Text = "Ready";
+            this.tspbMain.Visible = false;
+
+            // modal overlay & progress
+            this.modalOverlay.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.modalOverlay.BackColor = System.Drawing.Color.FromArgb(120, 0, 0, 0);
+            this.modalOverlay.Visible = false;
+
+            this.modalProgress.Width = 520;
+            this.modalProgress.Height = 140;
+            this.modalProgress.BackColor = System.Drawing.Color.White;
+            this.modalProgress.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.modalProgress.Controls.Add(this.lblModalTitle);
+            this.modalProgress.Controls.Add(this.modalProgressBar);
+            this.modalProgress.Controls.Add(this.btnModalCancel);
+            this.lblModalTitle.Text = "Processing...";
+            this.lblModalTitle.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblModalTitle.Location = new System.Drawing.Point(12, 8);
+            this.modalProgressBar.Location = new System.Drawing.Point(12, 44);
+            this.modalProgressBar.Width = 496;
+            this.modalProgressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
+            this.btnModalCancel.Text = "Cancel";
+            this.btnModalCancel.Location = new System.Drawing.Point(420, 88);
+
+            this.modalOverlay.Controls.Add(this.modalProgress);
+            this.modalOverlay.Controls.Add(this.modalProgress);
+            this.modalProgress.Left = (this.Width - modalProgress.Width) / 2;
+            this.modalProgress.Top = (this.Height - modalProgress.Height) / 2;
+
+            // compose
+            this.mainSplit.Panel1.Controls.Add(this.leftPanel);
+            this.mainSplit.Panel2.Controls.Add(this.rightTopPanel);
+            this.rightTopPanel.Controls.Add(this.filtersPanel);
+            this.rightTopPanel.Controls.Add(this.gvPipelines);
+            this.rightTopPanel.Controls.Add(this.tabDetails);
+
+            // add to form
+            this.Controls.Add(this.mainSplit);
+            this.Controls.Add(this.headerPanel);
+            this.Controls.Add(this.statusStrip);
+            this.Controls.Add(this.modalOverlay);
+
+            // final form
+            this.Text = "Integration Pipeline Dashboard";
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.MinimumSize = new System.Drawing.Size(1200, 760);
+        }
+        #endregion
     }
-
-    // applique os mínimos e ajuste SplitterDistance para ficar consistente
-    this.mainSplit.Panel1MinSize = panel1Min;
-    this.mainSplit.Panel2MinSize = panel2Min;
-
-    // define SplitterDistance em um valor válido (por exemplo um pouco maior que panel1Min)
-    int desiredSplitter = Math.Min(Math.Max(panel1Min + 40, this.mainSplit.SplitterDistance), totalWidth - panel2Min - 10);
-    // Math.Clamp alternativa (se não disponível):
-    if (desiredSplitter < panel1Min) desiredSplitter = panel1Min;
-    if (desiredSplitter > totalWidth - panel2Min - 10) desiredSplitter = totalWidth - panel2Min - 10;
-
-    this.mainSplit.SplitterDistance = desiredSplitter;
 }
