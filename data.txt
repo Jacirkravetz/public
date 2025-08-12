@@ -226,3 +226,81 @@ namespace LogExtractorApp
         }
     }
 }
+
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Threading.Tasks;
+
+public class Processador
+{
+    public void ProcessarComThreads(DataGridView dgv)
+    {
+        // Obter lista de IDs da grid
+        var listaIds = dgv.Rows
+            .Cast<DataGridViewRow>()
+            .Where(r => r.Cells["Id"].Value != null)
+            .Select(r => r.Cells["Id"].Value.ToString())
+            .ToList();
+
+        if (!listaIds.Any())
+        {
+            MessageBox.Show("Nenhum registro para processar.");
+            return;
+        }
+
+        Console.WriteLine($"Iniciando processamento de {listaIds.Count} registros em 5 threads...");
+
+        // Criar um particionador para dividir a carga em até 5 threads
+        var partitioner = Partitioner.Create(listaIds, EnumerablePartitionerOptions.NoBuffering);
+
+        Parallel.ForEach(partitioner, new ParallelOptions { MaxDegreeOfParallelism = 5 }, id =>
+        {
+            try
+            {
+                // Chamar API
+                var resultadoApi = ChamarApi(id);
+
+                // Salvar no banco
+                SalvarNoBanco(id, resultadoApi);
+
+                Console.WriteLine($"[Thread {Task.CurrentId}] ID {id} processado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao processar ID {id}: {ex.Message}");
+            }
+        });
+
+        Console.WriteLine("✅ Processamento concluído!");
+
+        // Atualizar GridView e reaplicar filtros
+        AtualizarGridComFiltros(dgv);
+    }
+
+    private string ChamarApi(string id)
+    {
+        // Simula tempo de chamada
+        Task.Delay(200).Wait();
+        return $"Retorno da API para ID {id}";
+    }
+
+    private void SalvarNoBanco(string id, string resultado)
+    {
+        // Simula gravação no banco
+        Task.Delay(100).Wait();
+        Console.WriteLine($"Salvo no banco: ID={id}, Resultado={resultado}");
+    }
+
+    private void AtualizarGridComFiltros(DataGridView dgv)
+    {
+        // Aqui você recarrega os dados e reaplica os filtros que o usuário selecionou
+        Console.WriteLine("Recarregando Grid e aplicando filtros...");
+        // Exemplo:
+        // dgv.DataSource = ObterDadosFiltrados();
+    }
+}
+
