@@ -1,168 +1,228 @@
+// DataProcessorForm.Designer.cs
 namespace LogExtractorApp
 {
     partial class DataProcessorForm
     {
         private System.ComponentModel.IContainer components = null;
 
-        private System.Windows.Forms.DataGridView dataGridViewResults;
-        private System.Windows.Forms.Button btnLoadData;
-        private System.Windows.Forms.Button btnApplyRegexFilter;
-        private System.Windows.Forms.Button btnProcessSelected;
-        private System.Windows.Forms.TextBox txtRegexPattern;
-        private System.Windows.Forms.Label lblRegexPattern;
-
+        private System.Windows.Forms.Panel panelTop;
+        private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Label lblHasDelivery;
-        private System.Windows.Forms.Label lblHasConfirmation;
-        private System.Windows.Forms.Label lblHasResponse;
-        private System.Windows.Forms.Label lblHasDeliveryDev;
-
         private System.Windows.Forms.ComboBox cmbHasDelivery;
+        private System.Windows.Forms.Label lblHasConfirmation;
         private System.Windows.Forms.ComboBox cmbHasConfirmation;
+        private System.Windows.Forms.Label lblHasResponse;
         private System.Windows.Forms.ComboBox cmbHasResponse;
+        private System.Windows.Forms.Label lblHasDeliveryDev;
         private System.Windows.Forms.ComboBox cmbHasDeliveryDev;
+        private System.Windows.Forms.Label lblRegex;
+        private System.Windows.Forms.TextBox txtRegexPattern;
+        private System.Windows.Forms.Button btnLoadData;
+        private System.Windows.Forms.Button btnApplyRegex;
+        private System.Windows.Forms.Button btnProcessSelected;
+        private System.Windows.Forms.Button btnClear;
+        private System.Windows.Forms.DataGridView dgvData;
+        private System.Windows.Forms.Panel panelBottom;
+        private System.Windows.Forms.Label lblStatusInfo;
 
-        /// <summary>
+        /// <summary> 
         /// Clean up any resources being used.
         /// </summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
-            {
                 components.Dispose();
-            }
             base.Dispose(disposing);
         }
 
-        #region Windows Form Designer generated code
         private void InitializeComponent()
         {
-            this.dataGridViewResults = new System.Windows.Forms.DataGridView();
-            this.btnLoadData = new System.Windows.Forms.Button();
-            this.btnApplyRegexFilter = new System.Windows.Forms.Button();
-            this.btnProcessSelected = new System.Windows.Forms.Button();
-            this.txtRegexPattern = new System.Windows.Forms.TextBox();
-            this.lblRegexPattern = new System.Windows.Forms.Label();
+            this.components = new System.ComponentModel.Container();
 
+            this.panelTop = new System.Windows.Forms.Panel();
+            this.lblTitle = new System.Windows.Forms.Label();
             this.lblHasDelivery = new System.Windows.Forms.Label();
-            this.lblHasConfirmation = new System.Windows.Forms.Label();
-            this.lblHasResponse = new System.Windows.Forms.Label();
-            this.lblHasDeliveryDev = new System.Windows.Forms.Label();
-
             this.cmbHasDelivery = new System.Windows.Forms.ComboBox();
+            this.lblHasConfirmation = new System.Windows.Forms.Label();
             this.cmbHasConfirmation = new System.Windows.Forms.ComboBox();
+            this.lblHasResponse = new System.Windows.Forms.Label();
             this.cmbHasResponse = new System.Windows.Forms.ComboBox();
+            this.lblHasDeliveryDev = new System.Windows.Forms.Label();
             this.cmbHasDeliveryDev = new System.Windows.Forms.ComboBox();
+            this.lblRegex = new System.Windows.Forms.Label();
+            this.txtRegexPattern = new System.Windows.Forms.TextBox();
+            this.btnLoadData = new System.Windows.Forms.Button();
+            this.btnApplyRegex = new System.Windows.Forms.Button();
+            this.btnProcessSelected = new System.Windows.Forms.Button();
+            this.btnClear = new System.Windows.Forms.Button();
 
-            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).BeginInit();
-            this.SuspendLayout();
+            this.dgvData = new System.Windows.Forms.DataGridView();
+            this.panelBottom = new System.Windows.Forms.Panel();
+            this.lblStatusInfo = new System.Windows.Forms.Label();
 
-            // DataGridView
-            this.dataGridViewResults.AllowUserToAddRows = false;
-            this.dataGridViewResults.AllowUserToDeleteRows = false;
-            this.dataGridViewResults.AllowUserToResizeRows = false;
-            this.dataGridViewResults.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
-            this.dataGridViewResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dataGridViewResults.MultiSelect = true;
-            this.dataGridViewResults.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.dataGridViewResults.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dataGridViewResults.ReadOnly = true;
-            this.dataGridViewResults.Location = new System.Drawing.Point(12, 120);
-            this.dataGridViewResults.Size = new System.Drawing.Size(960, 480);
-            this.dataGridViewResults.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-                        | System.Windows.Forms.AnchorStyles.Left)
-                        | System.Windows.Forms.AnchorStyles.Right)));
+            // panelTop
+            this.panelTop.BackColor = System.Drawing.Color.FromArgb(245, 245, 245);
+            this.panelTop.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panelTop.Height = 110;
+            this.panelTop.Padding = new System.Windows.Forms.Padding(12);
+            this.panelTop.Controls.Add(this.lblTitle);
+            this.panelTop.Controls.Add(this.lblHasDelivery);
+            this.panelTop.Controls.Add(this.cmbHasDelivery);
+            this.panelTop.Controls.Add(this.lblHasConfirmation);
+            this.panelTop.Controls.Add(this.cmbHasConfirmation);
+            this.panelTop.Controls.Add(this.lblHasResponse);
+            this.panelTop.Controls.Add(this.cmbHasResponse);
+            this.panelTop.Controls.Add(this.lblHasDeliveryDev);
+            this.panelTop.Controls.Add(this.cmbHasDeliveryDev);
+            this.panelTop.Controls.Add(this.lblRegex);
+            this.panelTop.Controls.Add(this.txtRegexPattern);
+            this.panelTop.Controls.Add(this.btnLoadData);
+            this.panelTop.Controls.Add(this.btnApplyRegex);
+            this.panelTop.Controls.Add(this.btnProcessSelected);
+            this.panelTop.Controls.Add(this.btnClear);
 
-            // lblHasDelivery
+            // lblTitle
+            this.lblTitle.Text = "Data Processor";
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
+            this.lblTitle.ForeColor = System.Drawing.Color.FromArgb(30, 30, 30);
+            this.lblTitle.Location = new System.Drawing.Point(12, 8);
+            this.lblTitle.AutoSize = true;
+
+            // lblHasDelivery + cmbHasDelivery
+            this.lblHasDelivery.Text = "Has Delivery";
+            this.lblHasDelivery.Location = new System.Drawing.Point(12, 48);
             this.lblHasDelivery.AutoSize = true;
-            this.lblHasDelivery.Location = new System.Drawing.Point(12, 15);
-            this.lblHasDelivery.Text = "Has Delivery:";
-
-            // cmbHasDelivery
             this.cmbHasDelivery.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasDelivery.Items.AddRange(new object[] { "", "Yes", "No" });
-            this.cmbHasDelivery.Location = new System.Drawing.Point(100, 12);
-            this.cmbHasDelivery.Width = 80;
+            this.cmbHasDelivery.Items.AddRange(new object[] { "ALL", "YES", "NO" });
+            this.cmbHasDelivery.Location = new System.Drawing.Point(95, 44);
+            this.cmbHasDelivery.Width = 100;
+            this.cmbHasDelivery.SelectedIndex = 0;
 
-            // lblHasConfirmation
+            // lblHasConfirmation + cmbHasConfirmation
+            this.lblHasConfirmation.Text = "Has Confirmation";
+            this.lblHasConfirmation.Location = new System.Drawing.Point(210, 48);
             this.lblHasConfirmation.AutoSize = true;
-            this.lblHasConfirmation.Location = new System.Drawing.Point(200, 15);
-            this.lblHasConfirmation.Text = "Has Confirmation:";
-
-            // cmbHasConfirmation
             this.cmbHasConfirmation.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasConfirmation.Items.AddRange(new object[] { "", "Yes", "No" });
-            this.cmbHasConfirmation.Location = new System.Drawing.Point(320, 12);
-            this.cmbHasConfirmation.Width = 80;
+            this.cmbHasConfirmation.Items.AddRange(new object[] { "ALL", "YES", "NO" });
+            this.cmbHasConfirmation.Location = new System.Drawing.Point(335, 44);
+            this.cmbHasConfirmation.Width = 100;
+            this.cmbHasConfirmation.SelectedIndex = 0;
 
-            // lblHasResponse
+            // lblHasResponse + cmbHasResponse
+            this.lblHasResponse.Text = "Has Response";
+            this.lblHasResponse.Location = new System.Drawing.Point(460, 48);
             this.lblHasResponse.AutoSize = true;
-            this.lblHasResponse.Location = new System.Drawing.Point(420, 15);
-            this.lblHasResponse.Text = "Has Response:";
-
-            // cmbHasResponse
             this.cmbHasResponse.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasResponse.Items.AddRange(new object[] { "", "Yes", "No" });
-            this.cmbHasResponse.Location = new System.Drawing.Point(520, 12);
-            this.cmbHasResponse.Width = 80;
+            this.cmbHasResponse.Items.AddRange(new object[] { "ALL", "YES", "NO" });
+            this.cmbHasResponse.Location = new System.Drawing.Point(560, 44);
+            this.cmbHasResponse.Width = 100;
+            this.cmbHasResponse.SelectedIndex = 0;
 
-            // lblHasDeliveryDev
+            // lblHasDeliveryDev + cmbHasDeliveryDev
+            this.lblHasDeliveryDev.Text = "Has Delivery DEV";
+            this.lblHasDeliveryDev.Location = new System.Drawing.Point(685, 48);
             this.lblHasDeliveryDev.AutoSize = true;
-            this.lblHasDeliveryDev.Location = new System.Drawing.Point(620, 15);
-            this.lblHasDeliveryDev.Text = "Has Delivery DEV:";
-
-            // cmbHasDeliveryDev
             this.cmbHasDeliveryDev.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbHasDeliveryDev.Items.AddRange(new object[] { "", "Yes", "No" });
-            this.cmbHasDeliveryDev.Location = new System.Drawing.Point(750, 12);
-            this.cmbHasDeliveryDev.Width = 80;
+            this.cmbHasDeliveryDev.Items.AddRange(new object[] { "ALL", "YES", "NO" });
+            this.cmbHasDeliveryDev.Location = new System.Drawing.Point(795, 44);
+            this.cmbHasDeliveryDev.Width = 100;
+            this.cmbHasDeliveryDev.SelectedIndex = 0;
 
-            // lblRegexPattern
-            this.lblRegexPattern.AutoSize = true;
-            this.lblRegexPattern.Location = new System.Drawing.Point(12, 50);
-            this.lblRegexPattern.Text = "Regex Filter:";
-
-            // txtRegexPattern
-            this.txtRegexPattern.Location = new System.Drawing.Point(100, 47);
-            this.txtRegexPattern.Width = 250;
+            // lblRegex + txtRegexPattern
+            this.lblRegex.Text = "Regex Filter";
+            this.lblRegex.Location = new System.Drawing.Point(12, 76);
+            this.lblRegex.AutoSize = true;
+            this.txtRegexPattern.Location = new System.Drawing.Point(95, 72);
+            this.txtRegexPattern.Width = 420;
 
             // btnLoadData
-            this.btnLoadData.Location = new System.Drawing.Point(370, 45);
             this.btnLoadData.Text = "Load Data";
-            this.btnLoadData.Click += new System.EventHandler(this.BtnLoadData_Click);
+            this.btnLoadData.BackColor = System.Drawing.Color.FromArgb(0, 123, 215);
+            this.btnLoadData.ForeColor = System.Drawing.Color.White;
+            this.btnLoadData.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnLoadData.Location = new System.Drawing.Point(540, 70);
+            this.btnLoadData.Width = 110;
 
-            // btnApplyRegexFilter
-            this.btnApplyRegexFilter.Location = new System.Drawing.Point(470, 45);
-            this.btnApplyRegexFilter.Text = "Apply Regex Filter";
-            this.btnApplyRegexFilter.Click += new System.EventHandler(this.BtnApplyRegexFilter_Click);
+            // btnApplyRegex
+            this.btnApplyRegex.Text = "Apply Regex";
+            this.btnApplyRegex.BackColor = System.Drawing.Color.FromArgb(70, 130, 180);
+            this.btnApplyRegex.ForeColor = System.Drawing.Color.White;
+            this.btnApplyRegex.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnApplyRegex.Location = new System.Drawing.Point(660, 70);
+            this.btnApplyRegex.Width = 110;
 
             // btnProcessSelected
-            this.btnProcessSelected.Location = new System.Drawing.Point(620, 45);
             this.btnProcessSelected.Text = "Process Selected";
-            this.btnProcessSelected.Click += new System.EventHandler(this.BtnProcessSelected_Click);
+            this.btnProcessSelected.BackColor = System.Drawing.Color.FromArgb(0, 123, 215);
+            this.btnProcessSelected.ForeColor = System.Drawing.Color.White;
+            this.btnProcessSelected.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnProcessSelected.Location = new System.Drawing.Point(780, 70);
+            this.btnProcessSelected.Width = 130;
 
-            // Form
-            this.ClientSize = new System.Drawing.Size(984, 611);
-            this.Controls.Add(this.dataGridViewResults);
-            this.Controls.Add(this.lblHasDelivery);
-            this.Controls.Add(this.cmbHasDelivery);
-            this.Controls.Add(this.lblHasConfirmation);
-            this.Controls.Add(this.cmbHasConfirmation);
-            this.Controls.Add(this.lblHasResponse);
-            this.Controls.Add(this.cmbHasResponse);
-            this.Controls.Add(this.lblHasDeliveryDev);
-            this.Controls.Add(this.cmbHasDeliveryDev);
-            this.Controls.Add(this.lblRegexPattern);
-            this.Controls.Add(this.txtRegexPattern);
-            this.Controls.Add(this.btnLoadData);
-            this.Controls.Add(this.btnApplyRegexFilter);
-            this.Controls.Add(this.btnProcessSelected);
-            this.Name = "DataProcessorForm";
+            // btnClear
+            this.btnClear.Text = "Clear";
+            this.btnClear.BackColor = System.Drawing.Color.FromArgb(220, 53, 69);
+            this.btnClear.ForeColor = System.Drawing.Color.White;
+            this.btnClear.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnClear.Location = new System.Drawing.Point(920, 70);
+            this.btnClear.Width = 80;
+
+            // dgvData
+            this.dgvData.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dgvData.Location = new System.Drawing.Point(0, 110);
+            this.dgvData.Margin = new System.Windows.Forms.Padding(12);
+            this.dgvData.AllowUserToAddRows = false;
+            this.dgvData.AllowUserToDeleteRows = false;
+            this.dgvData.AllowUserToResizeRows = false;
+            this.dgvData.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+            this.dgvData.AutoSizeRowsMode = System.Windows.Forms.DataGridViewAutoSizeRowsMode.AllCells;
+            this.dgvData.BackgroundColor = System.Drawing.Color.White;
+            this.dgvData.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.dgvData.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dgvData.EnableHeadersVisualStyles = false;
+            this.dgvData.GridColor = System.Drawing.Color.LightGray;
+            this.dgvData.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dgvData.MultiSelect = true;
+            this.dgvData.Scroll += new System.Windows.Forms.ScrollEventHandler(this.DgvData_Scroll);
+
+            // panelBottom
+            this.panelBottom.BackColor = System.Drawing.Color.FromArgb(245, 245, 245);
+            this.panelBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.panelBottom.Height = 30;
+            this.panelBottom.Padding = new System.Windows.Forms.Padding(8);
+            this.panelBottom.Controls.Add(this.lblStatusInfo);
+
+            // lblStatusInfo
+            this.lblStatusInfo.Text = "Ready";
+            this.lblStatusInfo.Dock = System.Windows.Forms.DockStyle.Left;
+            this.lblStatusInfo.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            // DataProcessorForm (form)
+            this.ClientSize = new System.Drawing.Size(1024, 720);
+            this.Controls.Add(this.dgvData);
+            this.Controls.Add(this.panelTop);
+            this.Controls.Add(this.panelBottom);
+
+            // Place panelTop after adding controls to form
+            this.Controls.Add(this.panelTop);
+
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.MinimumSize = new System.Drawing.Size(1000, 650);
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "Data Processor";
-            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewResults)).EndInit();
+            this.Text = "Data Processor - Corporate";
+
+            // Hook events (designer -> code will re-hook again in constructor; harmless)
+            this.btnLoadData.Click += new System.EventHandler(this.BtnLoadData_Click);
+            this.btnApplyRegex.Click += new System.EventHandler(this.BtnApplyRegex_Click);
+            this.btnProcessSelected.Click += new System.EventHandler(this.BtnProcessSelected_Click);
+            this.btnClear.Click += new System.EventHandler(this.BtnClear_Click);
+            this.dgvData.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.DgvData_CellFormatting);
+
+            this.panelTop.ResumeLayout(false);
+            this.panelTop.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvData)).EndInit();
+            this.panelBottom.ResumeLayout(false);
             this.ResumeLayout(false);
-            this.PerformLayout();
         }
-        #endregion
     }
 }
