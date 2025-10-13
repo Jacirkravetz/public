@@ -1,4 +1,1 @@
-{% capture concat_raw %}{{ a }}_{{ b }}_{{ c }}{% endcapture %}
-{
-  "concat": "{{ concat_raw }}"
-}
+{% assign concat = a | append: "_" | append: b | append: "_" | append: c %}
