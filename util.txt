@@ -1,51 +1,3 @@
-dotnet add package Microsoft.Graph
-dotnet add package Azure.Identity
-dotnet add package Azure.Security.KeyVault.Secrets
-dotnet add package Microsoft.Extensions.Configuration
-dotnet add package Microsoft.Extensions.Configuration.Json
-
-{
-  "AzureAd": {
-    "TenantId": "SEU_TENANT_ID",
-    "ClientId": "SEU_CLIENT_ID"
-  },
-  "KeyVault": {
-    "VaultUrl": "https://seu-keyvault.vault.azure.net/",
-    "ClientSecretName": "SharePointClientSecret"
-  },
-  "SharePoint": {
-    "SiteId": "SEU_SITE_ID",
-    "DocumentLibrary": "Documents"
-  },
-  "Upload": {
-    "FilePath": "C:\\Temp\\arquivo.pdf"
-  }
-}
-
-
-using Azure.Identity;
-using Azure.Security.KeyVault.Secrets;
-
-namespace Security;
-
-public sealed class KeyVaultSecretProvider
-{
-    private readonly SecretClient _client;
-
-    public KeyVaultSecretProvider(string vaultUrl)
-    {
-        _client = new SecretClient(
-            new Uri(vaultUrl),
-            new DefaultAzureCredential());
-    }
-
-    public async Task<string> GetSecretAsync(string secretName)
-    {
-        var secret = await _client.GetSecretAsync(secretName);
-        return secret.Value.Value;
-    }
-}
-
 using Azure.Identity;
 using Microsoft.Graph;
 
@@ -55,16 +7,9 @@ public sealed class SharePointUploader
 {
     private readonly GraphServiceClient _graphClient;
 
-    public SharePointUploader(
-        string tenantId,
-        string clientId,
-        string clientSecret)
+    public SharePointUploader()
     {
-        var credential = new ClientSecretCredential(
-            tenantId,
-            clientId,
-            clientSecret);
-
+        var credential = new DefaultAzureCredential();
         _graphClient = new GraphServiceClient(credential);
     }
 
@@ -74,7 +19,7 @@ public sealed class SharePointUploader
         string filePath)
     {
         if (!File.Exists(filePath))
-            throw new FileNotFoundException("Arquivo não encontrado.", filePath);
+            throw new FileNotFoundException(filePath);
 
         var drives = await _graphClient
             .Sites[siteId]
@@ -92,48 +37,5 @@ public sealed class SharePointUploader
             .ItemWithPath(Path.GetFileName(filePath))
             .Content
             .PutAsync(stream);
-    }
-}
-using Microsoft.Extensions.Configuration;
-using Security;
-using SharePoint;
-
-class Program
-{
-    static async Task Main()
-    {
-        try
-        {
-            var config = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: false)
-                .Build();
-
-            var tenantId = config["AzureAd:TenantId"]!;
-            var clientId = config["AzureAd:ClientId"]!;
-            var vaultUrl = config["KeyVault:VaultUrl"]!;
-            var secretName = config["KeyVault:ClientSecretName"]!;
-            var siteId = config["SharePoint:SiteId"]!;
-            var library = config["SharePoint:DocumentLibrary"]!;
-            var filePath = config["Upload:FilePath"]!;
-
-            var secretProvider = new KeyVaultSecretProvider(vaultUrl);
-            var clientSecret = await secretProvider.GetSecretAsync(secretName);
-
-            var uploader = new SharePointUploader(
-                tenantId,
-                clientId,
-                clientSecret);
-
-            await uploader.UploadAsync(siteId, library, filePath);
-
-            Console.WriteLine("✅ Upload realizado com sucesso.");
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ Erro durante o upload:");
-            Console.WriteLine(ex.Message);
-            Console.ResetColor();
-        }
     }
 }
