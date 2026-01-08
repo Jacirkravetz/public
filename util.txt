@@ -1,183 +1,139 @@
-namespace WorkflowApp
+dotnet add package Microsoft.Graph
+dotnet add package Azure.Identity
+dotnet add package Azure.Security.KeyVault.Secrets
+dotnet add package Microsoft.Extensions.Configuration
+dotnet add package Microsoft.Extensions.Configuration.Json
+
 {
-    partial class WorkflowDashboard
+  "AzureAd": {
+    "TenantId": "SEU_TENANT_ID",
+    "ClientId": "SEU_CLIENT_ID"
+  },
+  "KeyVault": {
+    "VaultUrl": "https://seu-keyvault.vault.azure.net/",
+    "ClientSecretName": "SharePointClientSecret"
+  },
+  "SharePoint": {
+    "SiteId": "SEU_SITE_ID",
+    "DocumentLibrary": "Documents"
+  },
+  "Upload": {
+    "FilePath": "C:\\Temp\\arquivo.pdf"
+  }
+}
+
+
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+
+namespace Security;
+
+public sealed class KeyVaultSecretProvider
+{
+    private readonly SecretClient _client;
+
+    public KeyVaultSecretProvider(string vaultUrl)
     {
-        /// <summary>
-        ///  Required designer variable.
-        /// </summary>
-        private System.ComponentModel.IContainer components = null;
+        _client = new SecretClient(
+            new Uri(vaultUrl),
+            new DefaultAzureCredential());
+    }
 
-        /// <summary>
-        ///  Clean up resources.
-        /// </summary>
-        protected override void Dispose(bool disposing)
+    public async Task<string> GetSecretAsync(string secretName)
+    {
+        var secret = await _client.GetSecretAsync(secretName);
+        return secret.Value.Value;
+    }
+}
+
+using Azure.Identity;
+using Microsoft.Graph;
+
+namespace SharePoint;
+
+public sealed class SharePointUploader
+{
+    private readonly GraphServiceClient _graphClient;
+
+    public SharePointUploader(
+        string tenantId,
+        string clientId,
+        string clientSecret)
+    {
+        var credential = new ClientSecretCredential(
+            tenantId,
+            clientId,
+            clientSecret);
+
+        _graphClient = new GraphServiceClient(credential);
+    }
+
+    public async Task UploadAsync(
+        string siteId,
+        string documentLibrary,
+        string filePath)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Arquivo não encontrado.", filePath);
+
+        var drives = await _graphClient
+            .Sites[siteId]
+            .Drives
+            .GetAsync();
+
+        var drive = drives!.Value!
+            .First(d => d.Name == documentLibrary);
+
+        using var stream = File.OpenRead(filePath);
+
+        await _graphClient
+            .Drives[drive.Id]
+            .Root
+            .ItemWithPath(Path.GetFileName(filePath))
+            .Content
+            .PutAsync(stream);
+    }
+}
+using Microsoft.Extensions.Configuration;
+using Security;
+using SharePoint;
+
+class Program
+{
+    static async Task Main()
+    {
+        try
         {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
+            var config = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: false)
+                .Build();
+
+            var tenantId = config["AzureAd:TenantId"]!;
+            var clientId = config["AzureAd:ClientId"]!;
+            var vaultUrl = config["KeyVault:VaultUrl"]!;
+            var secretName = config["KeyVault:ClientSecretName"]!;
+            var siteId = config["SharePoint:SiteId"]!;
+            var library = config["SharePoint:DocumentLibrary"]!;
+            var filePath = config["Upload:FilePath"]!;
+
+            var secretProvider = new KeyVaultSecretProvider(vaultUrl);
+            var clientSecret = await secretProvider.GetSecretAsync(secretName);
+
+            var uploader = new SharePointUploader(
+                tenantId,
+                clientId,
+                clientSecret);
+
+            await uploader.UploadAsync(siteId, library, filePath);
+
+            Console.WriteLine("✅ Upload realizado com sucesso.");
         }
-
-        #region Windows Form Designer generated code
-
-        private void InitializeComponent()
+        catch (Exception ex)
         {
-            this.components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(WorkflowDashboard));
-
-            // ==== Form Settings ====
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.ClientSize = new System.Drawing.Size(1400, 900);
-            this.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.Text = "Workflow Dashboard";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-
-            // ==== Top Panel ====
-            Panel panelTop = new Panel();
-            panelTop.Dock = DockStyle.Top;
-            panelTop.Height = 80;
-            panelTop.BackColor = System.Drawing.Color.FromArgb(30, 50, 80);
-            panelTop.Padding = new Padding(15, 10, 15, 10);
-
-            Label lblTitle = new Label();
-            lblTitle.Text = "Workflow Dashboard";
-            lblTitle.ForeColor = Color.White;
-            lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
-            lblTitle.Dock = DockStyle.Left;
-            lblTitle.AutoSize = true;
-
-            Button btnRefresh = new Button();
-            btnRefresh.Text = "Refresh";
-            btnRefresh.BackColor = Color.FromArgb(0, 120, 215);
-            btnRefresh.ForeColor = Color.White;
-            btnRefresh.FlatStyle = FlatStyle.Flat;
-            btnRefresh.FlatAppearance.BorderSize = 0;
-            btnRefresh.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnRefresh.Size = new Size(100, 35);
-            btnRefresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnRefresh.Location = new Point(1270, 20);
-
-            panelTop.Controls.Add(btnRefresh);
-            panelTop.Controls.Add(lblTitle);
-
-            // ==== KPI Panel ====
-            FlowLayoutPanel panelKPI = new FlowLayoutPanel();
-            panelKPI.Dock = DockStyle.Top;
-            panelKPI.Height = 120;
-            panelKPI.Padding = new Padding(15, 10, 15, 10);
-            panelKPI.BackColor = Color.White;
-            panelKPI.FlowDirection = FlowDirection.LeftToRight;
-
-            panelKPI.Controls.Add(CreateKpiCard("Success", "0", Color.FromArgb(0, 153, 51)));
-            panelKPI.Controls.Add(CreateKpiCard("Failed", "0", Color.FromArgb(204, 0, 0)));
-            panelKPI.Controls.Add(CreateKpiCard("Pending", "0", Color.FromArgb(255, 204, 0)));
-            panelKPI.Controls.Add(CreateKpiCard("Running", "0", Color.FromArgb(0, 102, 204)));
-            panelKPI.Controls.Add(CreateKpiCard("Error", "0", Color.DarkRed));
-
-            // ==== Filter Panel ====
-            Panel panelFilters = new Panel();
-            panelFilters.Dock = DockStyle.Top;
-            panelFilters.Height = 60;
-            panelFilters.Padding = new Padding(15, 10, 15, 10);
-            panelFilters.BackColor = Color.White;
-
-            Label lblFrom = new Label();
-            lblFrom.Text = "From:";
-            lblFrom.Location = new Point(10, 15);
-            DateTimePicker dpFrom = new DateTimePicker();
-            dpFrom.Location = new Point(60, 10);
-            dpFrom.Width = 150;
-
-            Label lblTo = new Label();
-            lblTo.Text = "To:";
-            lblTo.Location = new Point(230, 15);
-            DateTimePicker dpTo = new DateTimePicker();
-            dpTo.Location = new Point(270, 10);
-            dpTo.Width = 150;
-
-            Label lblStatus = new Label();
-            lblStatus.Text = "Status:";
-            lblStatus.Location = new Point(440, 15);
-            ComboBox cbStatus = new ComboBox();
-            cbStatus.Items.AddRange(new string[] { "All", "Success", "Failed", "Pending", "Running", "Error" });
-            cbStatus.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbStatus.Location = new Point(500, 10);
-            cbStatus.Width = 150;
-
-            Label lblSearch = new Label();
-            lblSearch.Text = "Search:";
-            lblSearch.Location = new Point(670, 15);
-            TextBox txtSearch = new TextBox();
-            txtSearch.Location = new Point(730, 10);
-            txtSearch.Width = 200;
-
-            Button btnExport = new Button();
-            btnExport.Text = "Export";
-            btnExport.BackColor = Color.FromArgb(40, 167, 69);
-            btnExport.ForeColor = Color.White;
-            btnExport.FlatStyle = FlatStyle.Flat;
-            btnExport.FlatAppearance.BorderSize = 0;
-            btnExport.Location = new Point(950, 10);
-            btnExport.Width = 100;
-
-            panelFilters.Controls.AddRange(new Control[] { lblFrom, dpFrom, lblTo, dpTo, lblStatus, cbStatus, lblSearch, txtSearch, btnExport });
-
-            // ==== Data Grid ====
-            DataGridView dgvWorkflow = new DataGridView();
-            dgvWorkflow.Dock = DockStyle.Fill;
-            dgvWorkflow.BackgroundColor = Color.White;
-            dgvWorkflow.GridColor = Color.LightGray;
-            dgvWorkflow.AllowUserToAddRows = false;
-            dgvWorkflow.AllowUserToDeleteRows = false;
-            dgvWorkflow.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgvWorkflow.ReadOnly = true;
-            dgvWorkflow.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-
-            // Columns example
-            dgvWorkflow.Columns.Add("Date", "Date");
-            dgvWorkflow.Columns.Add("Source", "Source");
-            dgvWorkflow.Columns.Add("Destination", "Destination");
-            dgvWorkflow.Columns.Add("Status", "Status");
-            dgvWorkflow.Columns.Add("Duration", "Duration");
-            dgvWorkflow.Columns.Add("Details", "Details");
-
-            // ==== Layout ====
-            this.Controls.Add(dgvWorkflow);
-            this.Controls.Add(panelFilters);
-            this.Controls.Add(panelKPI);
-            this.Controls.Add(panelTop);
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("❌ Erro durante o upload:");
+            Console.WriteLine(ex.Message);
+            Console.ResetColor();
         }
-
-        private Panel CreateKpiCard(string title, string value, Color color)
-        {
-            Panel card = new Panel();
-            card.Width = 200;
-            card.Height = 100;
-            card.BackColor = color;
-            card.Margin = new Padding(10);
-            card.Padding = new Padding(10);
-
-            Label lblTitle = new Label();
-            lblTitle.Text = title;
-            lblTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            lblTitle.ForeColor = Color.White;
-            lblTitle.Dock = DockStyle.Top;
-
-            Label lblValue = new Label();
-            lblValue.Text = value;
-            lblValue.Font = new Font("Segoe UI", 22F, FontStyle.Bold);
-            lblValue.ForeColor = Color.White;
-            lblValue.Dock = DockStyle.Fill;
-            lblValue.TextAlign = ContentAlignment.MiddleCenter;
-
-            card.Controls.Add(lblValue);
-            card.Controls.Add(lblTitle);
-
-            return card;
-        }
-
-        #endregion
     }
 }
