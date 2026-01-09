@@ -1,11 +1,25 @@
-var fileName = Path.GetFileName(filePath);
-var targetPath = $"UploadsTest/{fileName}";
-
-using var stream = File.OpenRead(filePath);
-
-await _graphClient
-    .Drives[drive.Id]
-    .Root
-    .ItemWithPath(targetPath)
-    .Content
-    .PutAsync(stream);
+private async Task EnsureFolderExistsAsync(
+    string driveId,
+    string folderName)
+{
+    try
+    {
+        await _graphClient
+            .Drives[driveId]
+            .Root
+            .ItemWithPath(folderName)
+            .GetAsync();
+    }
+    catch
+    {
+        await _graphClient
+            .Drives[driveId]
+            .Root
+            .Children
+            .PostAsync(new DriveItem
+            {
+                Name = folderName,
+                Folder = new Folder()
+            });
+    }
+}
