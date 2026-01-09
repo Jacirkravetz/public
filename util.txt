@@ -1,29 +1,18 @@
-using Microsoft.Graph;
+using System.IdentityModel.Tokens.Jwt;
 
-private async Task EnsureFolderExistsAsync(string driveId, string folderName)
+static void PrintTokenRoles(string accessToken)
 {
-    try
-    {
-        // Se conseguir buscar a pasta, ela existe ✅
-        await _graphClient
-            .Drives[driveId]
-            .Root
-            .ItemWithPath(folderName)
-            .GetAsync();
-    }
-    catch (Microsoft.Graph.Models.ODataErrors.ODataError)
-    {
-        // Se não existe, cria ✅
-        var folderToCreate = new DriveItem
-        {
-            Name = folderName,
-            Folder = new Folder()
-        };
+    var handler = new JwtSecurityTokenHandler();
+    var jwt = handler.ReadJwtToken(accessToken);
 
-        await _graphClient
-            .Drives[driveId]
-            .Items["root"]
-            .Children
-            .PostAsync(folderToCreate);
-    }
+    var roles = jwt.Claims
+        .Where(c => c.Type == "roles")
+        .Select(c => c.Value)
+        .ToList();
+
+    Console.WriteLine("==== ROLES no token ====");
+    foreach (var r in roles)
+        Console.WriteLine(r);
+
+    Console.WriteLine("========================");
 }
