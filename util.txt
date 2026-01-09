@@ -1,25 +1,29 @@
-private async Task EnsureFolderExistsAsync(
-    string driveId,
-    string folderName)
+using Microsoft.Graph;
+
+private async Task EnsureFolderExistsAsync(string driveId, string folderName)
 {
     try
     {
+        // Se conseguir buscar a pasta, ela existe ✅
         await _graphClient
             .Drives[driveId]
             .Root
             .ItemWithPath(folderName)
             .GetAsync();
     }
-    catch
+    catch (Microsoft.Graph.Models.ODataErrors.ODataError)
     {
+        // Se não existe, cria ✅
+        var folderToCreate = new DriveItem
+        {
+            Name = folderName,
+            Folder = new Folder()
+        };
+
         await _graphClient
             .Drives[driveId]
-            .Root
+            .Items["root"]
             .Children
-            .PostAsync(new DriveItem
-            {
-                Name = folderName,
-                Folder = new Folder()
-            });
+            .PostAsync(folderToCreate);
     }
 }
