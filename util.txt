@@ -58,3 +58,8 @@ PrintTokenRoles(token.Token);
 
 // segue com Graph
 var graphClient = new GraphServiceClient(credential);
+
+
+
+GET https://graph.microsoft.com/v1.0/sites/{siteId}/permissions
+
