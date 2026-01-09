@@ -16,3 +16,45 @@ static void PrintTokenRoles(string accessToken)
 
     Console.WriteLine("========================");
 }
+
+
+var fileName = Path.GetFileName(filePath);
+var targetPath = $"UploadsTest/{fileName}";
+
+var uploadProps = new DriveItemUploadableProperties
+{
+    AdditionalData = new Dictionary<string, object>
+    {
+        { "@microsoft.graph.conflictBehavior", "replace" }
+    }
+};
+
+using var stream = File.OpenRead(filePath);
+
+await _graphClient
+    .Drives[drive.Id]
+    .Root
+    .ItemWithPath(targetPath)
+    .Content
+    .PutAsync(stream);
+
+using Azure.Core;
+using Azure.Identity;
+using Microsoft.Graph;
+using System.IdentityModel.Tokens.Jwt;
+
+// ... dentro do Main:
+
+var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+
+// ✅ pega o token real
+var token = await credential.GetTokenAsync(
+    new TokenRequestContext(new[] { "https://graph.microsoft.com/.default" }));
+
+Console.WriteLine("TOKEN (primeiros 50 chars): " + token.Token.Substring(0, 50) + "...");
+
+// ✅ imprime roles
+PrintTokenRoles(token.Token);
+
+// segue com Graph
+var graphClient = new GraphServiceClient(credential);
