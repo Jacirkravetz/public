@@ -1,1 +1,11 @@
-GET https://graph.microsoft.com/v1.0/sites/tenant.sharepoint.com:/sites/meusite
+var fileName = Path.GetFileName(filePath);
+var targetPath = $"UploadsTest/{fileName}";
+
+using var stream = File.OpenRead(filePath);
+
+await _graphClient
+    .Drives[drive.Id]
+    .Root
+    .ItemWithPath(targetPath)
+    .Content
+    .PutAsync(stream);
